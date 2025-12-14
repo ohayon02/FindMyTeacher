@@ -1,5 +1,6 @@
 package com.findmyteacher;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -31,8 +32,9 @@ public class ChooseActivity extends AppCompatActivity {
         loginButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                // TODO: Replace with navigation to LoginActivity
-                Toast.makeText(ChooseActivity.this, "Login Clicked!", Toast.LENGTH_SHORT).show();
+                // Start LoginActivity
+                Intent intent = new Intent(ChooseActivity.this, Login.class);
+                startActivity(intent);
             }
         });
 
