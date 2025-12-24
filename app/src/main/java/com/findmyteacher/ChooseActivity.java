@@ -4,11 +4,10 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
-import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets; // Corrected import statement
+import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
@@ -25,14 +24,12 @@ public class ChooseActivity extends AppCompatActivity {
             return insets;
         });
 
-        // Correct the button IDs to match the ones in your activity_choose.xml
         Button loginButton = findViewById(R.id.btnLogin);
         Button registerButton = findViewById(R.id.btnRegister);
 
         loginButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                // Start LoginActivity
                 Intent intent = new Intent(ChooseActivity.this, Login.class);
                 startActivity(intent);
             }
@@ -41,8 +38,8 @@ public class ChooseActivity extends AppCompatActivity {
         registerButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                // TODO: Replace with navigation to RegisterActivity
-                Toast.makeText(ChooseActivity.this, "Register Clicked!", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(ChooseActivity.this, Register.class);
+                startActivity(intent);
             }
         });
     }
