@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "74239074416",
+    "project_id": "find-my-teacher-26538",
+    "storage_bucket": "find-my-teacher-26538.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:74239074416:android:ef566d2d868815942094b5",
+        "android_client_info": {
+          "package_name": "com.findmyteacher"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC9odCW8Jbp0PFqqeVblza2me6vu5uvmBo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

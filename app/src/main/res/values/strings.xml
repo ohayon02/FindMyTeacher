@@ -1,35 +1,32 @@
 <resources>
     <string name="app_name">Find My Teacher</string>
     <string-array name="grades_array">
-        <item>כיתה א\'</item>
-        <item>כיתה ב\'</item>
-        <item>כיתה ג\'</item>
-        <item>כיתה ד\'</item>
-        <item>כיתה ה\'</item>
-        <item>כיתה ו\'</item>
-        <item>כיתה ז\'</item>
-        <item>כיתה ח\'</item>
-        <item>כיתה ט\'</item>
-        <item>כיתה י\'</item>
-        <item>כיתה י"א</item>
-        <item>כיתה י"ב</item>
+        <item>1st Grade</item>
+        <item>2nd Grade</item>
+        <item>3rd Grade</item>
+        <item>4th Grade</item>
+        <item>5th Grade</item>
+        <item>6th Grade</item>
+        <item>7th Grade</item>
+        <item>8th Grade</item>
+        <item>9th Grade</item>
+        <item>10th Grade</item>
+        <item>11th Grade</item>
+        <item>12th Grade</item>
     </string-array>
     <string-array name="subjects_array">
-        <item>מתמטיקה</item>
-        <item>אנגלית</item>
-        <item>לשון</item>
-        <item>פיזיקה</item>
-        <item>ביולוגיה</item>
-        <item>כימיה</item>
-        <item>היסטוריה</item>
-        <item>תנ"ך</item>
-        <item>מדעי המחשב</item>
-        <item>ספרות</item>
-        <item>אזרחות</item>
+        <item>Mathematics</item>
+        <item>English</item>
+        <item>Physics</item>
+        <item>Biology</item>
+        <item>Chemistry</item>
+        <item>History</item>
+        <item>Computer Science</item>
+        <item>Literature</item>
     </string-array>
     <string-array name="levels_array">
-        <item>יסודי</item>
-        <item>חטיבה</item>
-        <item>תיכון</item>
+        <item>Elementary</item>
+        <item>Middle School</item>
+        <item>High School</item>
     </string-array>
 </resources>
