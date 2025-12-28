@@ -20,25 +20,55 @@
             android:text="שם המורה"
             android:textSize="20sp"
             android:textStyle="bold"
-            android:textColor="#333333" />
+            android:textColor="#075E54" />
 
         <TextView
             android:id="@+id/tvTeacherSubjects"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="מקצועות: מתמטיקה, אנגלית"
-            android:textSize="16sp"
+            android:text="מקצועות: מתמטיקה"
+            android:textSize="14sp"
+            android:layout_marginTop="2dp"
+            android:textColor="#333333" />
+
+        <TextView
+            android:id="@+id/tvTeacherPrice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="מחיר: -"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#D32F2F"
+            android:layout_marginTop="4dp" />
+
+        <TextView
+            android:id="@+id/tvTeacherLocation"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="מיקום: -"
+            android:textSize="14sp"
+            android:layout_marginTop="2dp" />
+
+        <TextView
+            android:id="@+id/tvTeacherBio"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="ביוגרפיה..."
+            android:textSize="13sp"
             android:layout_marginTop="4dp"
+            android:maxLines="2"
+            android:ellipsize="end"
             android:textColor="#666666" />
 
         <Button
             android:id="@+id/btnChatWithTeacher"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="wrap_content"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="end"
-            android:layout_marginTop="8dp"
-            android:text="שלח הודעה" />
+            android:layout_marginTop="12dp"
+            android:text="שלח הודעה בצאט"
+            android:textColor="#075E54"
+            app:strokeColor="#075E54" />
 
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

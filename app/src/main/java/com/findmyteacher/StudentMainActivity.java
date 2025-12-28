@@ -3,7 +3,7 @@ package com.findmyteacher;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.ImageButton;
+import android.widget.Button;
 import android.widget.SearchView;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
@@ -35,7 +35,7 @@ public class StudentMainActivity extends AppCompatActivity {
         mAuth = FirebaseAuth.getInstance();
         
         tvWelcome = findViewById(R.id.tvWelcomeUser);
-        ImageButton btnLogout = findViewById(R.id.btnLogout);
+        Button btnLogout = findViewById(R.id.btnLogout);
         recyclerView = findViewById(R.id.rvTeachers);
         SearchView searchView = findViewById(R.id.searchTeachers);
 
@@ -43,7 +43,9 @@ public class StudentMainActivity extends AppCompatActivity {
 
         btnLogout.setOnClickListener(v -> {
             mAuth.signOut();
-            startActivity(new Intent(StudentMainActivity.this, ChooseActivity.class));
+            Intent intent = new Intent(StudentMainActivity.this, ChooseActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
             finish();
         });
 
@@ -74,6 +76,7 @@ public class StudentMainActivity extends AppCompatActivity {
     }
 
     private void loadUserData() {
+        if (mAuth.getCurrentUser() == null) return;
         String uid = mAuth.getCurrentUser().getUid();
         db.collection("users").document(uid).get().addOnSuccessListener(documentSnapshot -> {
             if (documentSnapshot.exists()) {
@@ -94,7 +97,14 @@ public class StudentMainActivity extends AppCompatActivity {
                         String name = doc.getString("fullName");
                         String email = doc.getString("email");
                         List<Map<String, String>> subjects = (List<Map<String, String>>) doc.get("subjects");
-                        allTeachers.add(new Teacher(id, name, email, subjects));
+                        
+                        // קבלת הפרטים החדשים מהמסמך
+                        String price = doc.getString("hourlyPrice");
+                        String location = doc.getString("location");
+                        String bio = doc.getString("bio");
+                        String extraInfo = doc.getString("extraInfo");
+                        
+                        allTeachers.add(new Teacher(id, name, email, subjects, price, location, bio, extraInfo));
                     }
                     filteredTeachers.clear();
                     filteredTeachers.addAll(allTeachers);

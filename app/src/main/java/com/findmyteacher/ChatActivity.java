@@ -2,8 +2,10 @@ package com.findmyteacher;
 
 import android.os.Bundle;
 import android.util.Log;
+import android.view.MenuItem;
 import android.widget.EditText;
 import android.widget.Toast;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -40,6 +42,11 @@ public class ChatActivity extends AppCompatActivity {
 
         db = FirebaseFirestore.getInstance();
         mAuth = FirebaseAuth.getInstance();
+        
+        if (mAuth.getCurrentUser() == null) {
+            finish();
+            return;
+        }
         currentUserId = mAuth.getCurrentUser().getUid();
 
         // Get info from intent
@@ -55,10 +62,10 @@ public class ChatActivity extends AppCompatActivity {
         Toolbar toolbar = findViewById(R.id.chatToolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle(otherUserName);
+            getSupportActionBar().setTitle(otherUserName != null ? otherUserName : "Chat");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setDisplayShowHomeEnabled(true);
         }
-        toolbar.setNavigationOnClickListener(v -> finish());
 
         rvMessages = findViewById(R.id.rvMessages);
         etMessage = findViewById(R.id.etMessage);
@@ -73,11 +80,24 @@ public class ChatActivity extends AppCompatActivity {
         rvMessages.setAdapter(adapter);
 
         // Unique chatId for this pair
-        chatId = generateChatId(currentUserId, otherUserId);
-
-        listenForMessages();
+        if (otherUserId != null) {
+            chatId = generateChatId(currentUserId, otherUserId);
+            listenForMessages();
+        } else {
+            Toast.makeText(this, "Error: User not found", Toast.LENGTH_SHORT).show();
+            finish();
+        }
 
         btnSend.setOnClickListener(v -> sendMessage());
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     private String generateChatId(String id1, String id2) {

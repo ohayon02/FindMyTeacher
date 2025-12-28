@@ -13,6 +13,9 @@
         android:theme="@style/Theme.FindMyTeacher">
         
         <activity
+            android:name=".TeacherProfileEditActivity"
+            android:exported="false" />
+        <activity
             android:name=".ChatActivity"
             android:exported="false" />
         <activity
