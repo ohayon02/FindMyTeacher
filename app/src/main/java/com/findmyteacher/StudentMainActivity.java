@@ -15,6 +15,7 @@ import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 public class StudentMainActivity extends AppCompatActivity {
 
@@ -33,7 +34,7 @@ public class StudentMainActivity extends AppCompatActivity {
 
         db = FirebaseFirestore.getInstance();
         mAuth = FirebaseAuth.getInstance();
-        
+
         tvWelcome = findViewById(R.id.tvWelcomeUser);
         Button btnLogout = findViewById(R.id.btnLogout);
         recyclerView = findViewById(R.id.rvTeachers);
@@ -50,11 +51,26 @@ public class StudentMainActivity extends AppCompatActivity {
         });
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new TeacherAdapter(filteredTeachers, teacher -> {
-            Intent intent = new Intent(StudentMainActivity.this, ChatActivity.class);
-            intent.putExtra("teacherId", teacher.getId());
-            intent.putExtra("teacherName", teacher.getFullName());
-            startActivity(intent);
+
+        // Implement the new listener with two methods
+        adapter = new TeacherAdapter(filteredTeachers, new TeacherAdapter.OnTeacherClickListener() {
+            @Override
+            public void onTeacherClick(Teacher teacher) {
+                // Clicking the card opens Booking screen
+                Intent intent = new Intent(StudentMainActivity.this, BookingActivity.class);
+                intent.putExtra("teacherId", teacher.getId());
+                intent.putExtra("teacherName", teacher.getFullName());
+                startActivity(intent);
+            }
+
+            @Override
+            public void onChatClick(Teacher teacher) {
+                // Clicking the button opens the Chat screen
+                Intent intent = new Intent(StudentMainActivity.this, ChatActivity.class);
+                intent.putExtra("teacherId", teacher.getId());
+                intent.putExtra("teacherName", teacher.getFullName());
+                startActivity(intent);
+            }
         });
         recyclerView.setAdapter(adapter);
 
@@ -97,14 +113,26 @@ public class StudentMainActivity extends AppCompatActivity {
                         String name = doc.getString("fullName");
                         String email = doc.getString("email");
                         List<Map<String, String>> subjects = (List<Map<String, String>>) doc.get("subjects");
-                        
-                        // קבלת הפרטים החדשים מהמסמך
+
                         String price = doc.getString("hourlyPrice");
                         String location = doc.getString("location");
                         String bio = doc.getString("bio");
                         String extraInfo = doc.getString("extraInfo");
-                        
-                        allTeachers.add(new Teacher(id, name, email, subjects, price, location, bio, extraInfo));
+
+                        List<HashMap<String, Object>> slotsFromDb = (List<HashMap<String, Object>>) doc.get("availableSlots");
+                        List<LessonSlot> availableSlots = new ArrayList<>();
+                        if (slotsFromDb != null) {
+                            for (Map<String, Object> slotMap : slotsFromDb) {
+                                availableSlots.add(new LessonSlot(
+                                    (String) slotMap.get("date"),
+                                    (String) slotMap.get("startTime"),
+                                    (String) slotMap.get("endTime"),
+                                    (boolean) slotMap.get("booked")
+                                ));
+                            }
+                        }
+
+                        allTeachers.add(new Teacher(id, name, email, subjects, price, location, bio, extraInfo, availableSlots));
                     }
                     filteredTeachers.clear();
                     filteredTeachers.addAll(allTeachers);
@@ -121,7 +149,7 @@ public class StudentMainActivity extends AppCompatActivity {
             String lowerCaseQuery = query.toLowerCase();
             for (Teacher t : allTeachers) {
                 if (t.getSubjectsString().toLowerCase().contains(lowerCaseQuery) ||
-                    t.getFullName().toLowerCase().contains(lowerCaseQuery)) {
+                        t.getFullName().toLowerCase().contains(lowerCaseQuery)) {
                     filteredTeachers.add(t);
                 }
             }

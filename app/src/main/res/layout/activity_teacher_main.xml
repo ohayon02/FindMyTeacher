@@ -71,23 +71,22 @@
         android:layout_below="@id/tvSelectedDate"
         android:layout_marginTop="8dp" />
 
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabAddSlot"
+    <Button
+        android:id="@+id/btnManageAvailability"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
-        android:layout_alignParentEnd="true"
+        android:layout_toStartOf="@id/btnTeacherChats"
         android:layout_margin="16dp"
-        android:src="@android:drawable/ic_input_add"
-        app:backgroundTint="#075E54"
-        app:tint="@android:color/white" />
+        android:text="Manage Availability"
+        android:backgroundTint="#075E54" />
 
     <Button
         android:id="@+id/btnTeacherChats"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
-        android:layout_alignParentStart="true"
+        android:layout_alignParentEnd="true"
         android:layout_margin="16dp"
         android:text="My Chats"
         android:backgroundTint="#075E54" />

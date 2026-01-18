@@ -27,7 +27,7 @@ public class TeacherMainActivity extends AppCompatActivity {
         tvWelcome = findViewById(R.id.tvWelcomeTeacher);
         Button btnLogout = findViewById(R.id.btnLogout);
         Button btnTeacherChats = findViewById(R.id.btnTeacherChats);
-        FloatingActionButton fabAddProfileInfo = findViewById(R.id.fabAddSlot);
+        Button btnManageAvailability = findViewById(R.id.btnManageAvailability);
 
         loadUserData();
 
@@ -43,8 +43,8 @@ public class TeacherMainActivity extends AppCompatActivity {
             Toast.makeText(this, "מסך הצאטים בבנייה", Toast.LENGTH_SHORT).show();
         });
 
-        fabAddProfileInfo.setOnClickListener(v -> {
-            Intent intent = new Intent(TeacherMainActivity.this, TeacherProfileEditActivity.class);
+        btnManageAvailability.setOnClickListener(v -> {
+            Intent intent = new Intent(TeacherMainActivity.this, AvailabilityChatbotActivity.class);
             startActivity(intent);
         });
     }

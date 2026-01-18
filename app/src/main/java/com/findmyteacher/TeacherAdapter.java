@@ -14,7 +14,9 @@ public class TeacherAdapter extends RecyclerView.Adapter<TeacherAdapter.TeacherV
     private List<Teacher> teacherList;
     private OnTeacherClickListener listener;
 
+    // Interface with two methods for two different clicks
     public interface OnTeacherClickListener {
+        void onTeacherClick(Teacher teacher);
         void onChatClick(Teacher teacher);
     }
 
@@ -33,20 +35,7 @@ public class TeacherAdapter extends RecyclerView.Adapter<TeacherAdapter.TeacherV
     @Override
     public void onBindViewHolder(@NonNull TeacherViewHolder holder, int position) {
         Teacher teacher = teacherList.get(position);
-        holder.tvName.setText(teacher.getFullName());
-        holder.tvSubjects.setText("מקצועות: " + teacher.getSubjectsString());
-        
-        // הצגת פרטים נוספים אם קיימים
-        String price = teacher.getHourlyPrice();
-        holder.tvPrice.setText("מחיר לשיעור: " + (price != null && !price.isEmpty() ? price + " ₪" : "לא צוין"));
-        
-        String location = teacher.getLocation();
-        holder.tvLocation.setText("מיקום: " + (location != null && !location.isEmpty() ? location : "לא צוין"));
-        
-        String bio = teacher.getBio();
-        holder.tvBio.setText(bio != null && !bio.isEmpty() ? bio : "אין ביוגרפיה זמינה");
-
-        holder.btnChat.setOnClickListener(v -> listener.onChatClick(teacher));
+        holder.bind(teacher, listener);
     }
 
     @Override
@@ -60,7 +49,7 @@ public class TeacherAdapter extends RecyclerView.Adapter<TeacherAdapter.TeacherV
     }
 
     static class TeacherViewHolder extends RecyclerView.ViewHolder {
-        TextView tvName, tvSubjects, tvPrice, tvLocation, tvBio;
+        TextView tvName, tvSubjects, tvPrice, tvLocation, tvBio, tvAvailability;
         Button btnChat;
 
         public TeacherViewHolder(@NonNull View itemView) {
@@ -69,8 +58,25 @@ public class TeacherAdapter extends RecyclerView.Adapter<TeacherAdapter.TeacherV
             tvSubjects = itemView.findViewById(R.id.tvTeacherSubjects);
             tvPrice = itemView.findViewById(R.id.tvTeacherPrice);
             tvLocation = itemView.findViewById(R.id.tvTeacherLocation);
+            tvAvailability = itemView.findViewById(R.id.tvTeacherAvailability);
             tvBio = itemView.findViewById(R.id.tvTeacherBio);
             btnChat = itemView.findViewById(R.id.btnChatWithTeacher);
+        }
+
+        public void bind(final Teacher teacher, final OnTeacherClickListener listener) {
+            tvName.setText(teacher.getFullName());
+            tvSubjects.setText("מקצועות: " + teacher.getSubjectsString());
+            String price = teacher.getHourlyPrice();
+            tvPrice.setText("מחיר לשיעור: " + (price != null && !price.isEmpty() ? price + " ₪" : "לא צוין"));
+            String location = teacher.getLocation();
+            tvLocation.setText("מיקום: " + (location != null && !location.isEmpty() ? location : "לא צוין"));
+            tvAvailability.setText("זמינות: " + teacher.getAvailabilityString());
+            String bio = teacher.getBio();
+            tvBio.setText(bio != null && !bio.isEmpty() ? bio : "אין ביוגרפיה זמינה");
+
+            // Set click listeners
+            itemView.setOnClickListener(v -> listener.onTeacherClick(teacher));
+            btnChat.setOnClickListener(v -> listener.onChatClick(teacher));
         }
     }
 }
