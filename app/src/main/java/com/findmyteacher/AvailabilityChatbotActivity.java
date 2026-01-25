@@ -2,60 +2,77 @@ package com.findmyteacher;
 
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
+import android.util.Log;
 import android.view.MenuItem;
 import android.widget.EditText;
-import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.SetOptions;
 
-import java.text.ParseException;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import javax.net.ssl.HttpsURLConnection;
 
 public class AvailabilityChatbotActivity extends AppCompatActivity {
 
+    private static final String TAG = "ChatbotActivity";
     private RecyclerView rvMessages;
     private MessageAdapter adapter;
     private List<Message> messageList;
     private EditText etMessage;
-    private FloatingActionButton btnSend;
 
-    private FirebaseFirestore db;
     private String currentUserId;
+    private DocumentReference teacherRef;
     private static final String CHATBOT_ID = "chatbot_id";
 
-    private int conversationDayOffset = 0;
-    private boolean conversationActive = true;
+    private final List<JSONObject> chatHistory = new ArrayList<>();
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
 
-        db = FirebaseFirestore.getInstance();
+        // Ensure user is not null before getting UID
+        if (FirebaseAuth.getInstance().getCurrentUser() == null) {
+            // Handle error: user not logged in
+            finish();
+            return;
+        }
         currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        teacherRef = FirebaseFirestore.getInstance().collection("users").document(currentUserId);
 
         setupToolbar();
         setupRecyclerView();
+        setupSendButton();
 
-        etMessage = findViewById(R.id.etMessage);
-        btnSend = findViewById(R.id.btnSendMessage);
-        btnSend.setOnClickListener(v -> handleUserMessage());
-
+        addSystemInstruction();
         startConversation();
     }
 
@@ -63,7 +80,7 @@ public class AvailabilityChatbotActivity extends AppCompatActivity {
         Toolbar toolbar = findViewById(R.id.chatToolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle("Availability AI Assistant");
+            getSupportActionBar().setTitle("AI Assistant");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
     }
@@ -76,151 +93,259 @@ public class AvailabilityChatbotActivity extends AppCompatActivity {
         rvMessages.setAdapter(adapter);
     }
 
-    private void startConversation() {
-        addMessage(CHATBOT_ID, "Hello! I'm your AI assistant. Let's update your availability for the next 7 days.", 500);
-        askAboutNextDay();
+    private void setupSendButton() {
+        etMessage = findViewById(R.id.etMessage);
+        FloatingActionButton btnSend = findViewById(R.id.btnSendMessage);
+        btnSend.setOnClickListener(v -> handleUserMessage());
     }
 
-    private void askAboutNextDay() {
-        if (!conversationActive) return;
-        if (conversationDayOffset >= 7) {
-            conversationActive = false;
-            addMessage(CHATBOT_ID, "Great, we've updated the whole week! You can write to me anytime to make further changes.", 500);
-            return;
+    private void addSystemInstruction() {
+        try {
+            JSONObject systemInstruction = new JSONObject();
+            systemInstruction.put("role", "system");
+            JSONArray parts = new JSONArray();
+            parts.put(new JSONObject().put("text", "You are a helpful assistant for a teacher. Your goal is to answer any questions they have, and also help them manage their teaching schedule. Use the tools provided to you to update their availability. When you confirm a change, be explicit (e.g., \"I have updated your availability for Wednesday\"). Always respond in the user's language."));
+            systemInstruction.put("parts", parts);
+            chatHistory.add(systemInstruction);
+        } catch (JSONException e) {
+            Log.e(TAG, "Error creating system instruction", e);
         }
+    }
 
-        Calendar calendar = Calendar.getInstance();
-        calendar.add(Calendar.DAY_OF_YEAR, conversationDayOffset);
-        String dayName = new SimpleDateFormat("EEEE, MMMM d", Locale.ENGLISH).format(calendar.getTime());
-
-        String question = String.format("Are you available to teach on %s (4 PM - 8 PM)?", dayName);
-        addMessage(CHATBOT_ID, question, 1000);
+    private void startConversation() {
+        addMessage(CHATBOT_ID, "Hello! I'm your personal AI assistant. Ask me anything, or let me know how to update your schedule.", 0);
     }
 
     private void handleUserMessage() {
         String text = etMessage.getText().toString().trim();
         if (text.isEmpty()) return;
 
+        try {
+            JSONObject userMessage = new JSONObject();
+            userMessage.put("role", "user");
+            JSONArray parts = new JSONArray();
+            parts.put(new JSONObject().put("text", text));
+            userMessage.put("parts", parts);
+            chatHistory.add(userMessage);
+        } catch (JSONException e) {
+            Log.e(TAG, "Error creating user message", e);
+        }
+
         addMessage(currentUserId, text, 0);
         etMessage.setText("");
 
-        processUserResponse(text);
+        addMessage(CHATBOT_ID, "...", 300); // Thinking indicator
+
+        generateResponse();
     }
 
-    private void processUserResponse(String text) {
-        String lowerCaseText = text.toLowerCase();
-
-        // --- Enhanced AI Response --- //
-        if (handleSmallTalk(lowerCaseText)) {
-            return; // Small talk was handled, no need to process further
+    private void generateResponse() {
+        String apiKey = BuildConfig.API_KEY;
+        if (apiKey.isEmpty() || apiKey.equals("YOUR_API_KEY")) {
+            handler.post(() -> {
+                removeLastMessage();
+                addMessage(CHATBOT_ID, "AI features are disabled. Please set your API key in local.properties.", 0);
+            });
+            return;
         }
 
-        Date targetDate = parseDateFromText(lowerCaseText);
-        boolean isYes = lowerCaseText.contains("yes") || lowerCaseText.contains("available") || lowerCaseText.contains("free") || lowerCaseText.contains("כן") || lowerCaseText.contains("פנוי");
-        boolean isNo = lowerCaseText.contains("no") || lowerCaseText.contains("not") || lowerCaseText.contains("unavailable") || lowerCaseText.contains("לא");
+        executor.execute(() -> {
+            try {
+                URL url = new URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey);
+                HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
 
-        if (targetDate == null && conversationActive) { 
-            Calendar c = Calendar.getInstance();
-            c.add(Calendar.DAY_OF_YEAR, conversationDayOffset);
-            targetDate = c.getTime();
-        }
-        
-        if (isYes || isNo) {
-            if (targetDate != null) {
-                updateAvailability(targetDate, isYes);
-            } else {
-                 addMessage(CHATBOT_ID, "Which day are you referring to?", 500);
-            }
-        } else {
-            addMessage(CHATBOT_ID, "I'm sorry, I'm focused on setting your schedule right now. Please tell me if you are available for a specific day.", 500);
-        }
-    }
-    
-    private boolean handleSmallTalk(String text) {
-        if (text.contains("hello") || text.contains("שלום")) {
-            addMessage(CHATBOT_ID, "Hello there! Ready to set up your week?", 500);
-            return true;
-        }
-        if (text.contains("how are you") || text.contains("מה שלומך")) {
-            addMessage(CHATBOT_ID, "I'm a computer program, so I'm always running at optimal performance! How can I help you with your schedule today?", 500);
-            return true;
-        }
-        if (text.contains("thank you") || text.contains("thanks") || text.contains("תודה")){
-            addMessage(CHATBOT_ID, "You're welcome! Anything else I can help with?", 500);
-            return true;
-        }
-        return false;
-    }
+                JSONObject requestBody = buildRequestBody();
 
-    private Date parseDateFromText(String text) {
-        Calendar c = Calendar.getInstance();
-        if (text.contains("tomorrow") || text.contains("מחר")) {
-            c.add(Calendar.DAY_OF_YEAR, 1);
-            return c.getTime();
-        }
-        if (text.contains("today") || text.contains("היום")) {
-            return c.getTime();
-        }
-
-        String[] daysEn = {"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"};
-        String[] daysHe = {"ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"};
-
-        for (int i = 0; i < daysEn.length; i++) {
-            if (text.contains(daysEn[i]) || text.contains(daysHe[i])) {
-                int today = c.get(Calendar.DAY_OF_WEEK) - 1; // sunday=0
-                int diff = (i - today + 7) % 7;
-                if(diff == 0 && !text.contains("today")) diff = 7;
-                c.add(Calendar.DAY_OF_YEAR, diff);
-                return c.getTime();
-            }
-        }
-        return null;
-    }
-
-    private void updateAvailability(Date date, boolean isAvailable) {
-        String dateString = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date);
-        DocumentReference teacherRef = db.collection("users").document(currentUserId);
-
-        teacherRef.get().addOnSuccessListener(documentSnapshot -> {
-            if (documentSnapshot.exists()) {
-                List<Map<String, Object>> slots = (List<Map<String, Object>>) documentSnapshot.get("availableSlots");
-                if (slots == null) slots = new ArrayList<>();
-                
-                final String finalDateString = dateString;
-                slots.removeIf(slot -> finalDateString.equals(slot.get("date")));
-
-                String dayName = new SimpleDateFormat("EEEE", Locale.ENGLISH).format(date);
-                if (isAvailable) {
-                    LessonSlot newSlot = new LessonSlot(dateString, "16:00", "20:00", false);
-                    slots.add(newSlot.toMap());
-                    addMessage(CHATBOT_ID, "Great, I've set you as available for " + dayName + ".", 500);
-                } else {
-                    addMessage(CHATBOT_ID, "Got it, you are not available on " + dayName + ".", 500);
+                try (OutputStream os = conn.getOutputStream()) {
+                    byte[] input = requestBody.toString().getBytes("utf-8");
+                    os.write(input, 0, input.length);
                 }
 
-                teacherRef.update("availableSlots", slots).addOnSuccessListener(aVoid -> {
-                    if (conversationActive && dateString.equals(getTargetDateString(conversationDayOffset))) {
-                        conversationDayOffset++;
-                        askAboutNextDay();
+                int responseCode = conn.getResponseCode();
+                if (responseCode == HttpsURLConnection.HTTP_OK) {
+                    StringBuilder response = new StringBuilder();
+                    try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"))) {
+                        String responseLine;
+                        while ((responseLine = br.readLine()) != null) {
+                            response.append(responseLine.trim());
+                        }
                     }
+                    JSONObject responseJson = new JSONObject(response.toString());
+                    processResponse(responseJson);
+                } else {
+                    try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getErrorStream(), "utf-8"))) {
+                        String responseLine;
+                        StringBuilder errorResponse = new StringBuilder();
+                        while ((responseLine = br.readLine()) != null) {
+                            errorResponse.append(responseLine.trim());
+                        }
+                        Log.e(TAG, "API Error Response: " + errorResponse.toString());
+                    }
+                    throw new Exception("API call failed with response code: " + responseCode);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error during API call", e);
+                handler.post(() -> {
+                    removeLastMessage();
+                    addMessage(CHATBOT_ID, "Sorry, an error occurred while contacting the AI.", 0);
                 });
             }
         });
     }
 
-    private String getTargetDateString(int offset) {
-        Calendar c = Calendar.getInstance();
-        c.add(Calendar.DAY_OF_YEAR, offset);
-        return new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(c.getTime());
+    private JSONObject buildRequestBody() throws JSONException {
+        JSONObject requestBody = new JSONObject();
+        requestBody.put("contents", new JSONArray(chatHistory));
+
+        JSONObject functionDeclaration = new JSONObject();
+        functionDeclaration.put("name", "updateAvailability");
+        functionDeclaration.put("description", "Updates the teacher's availability for a specific date.");
+
+        JSONObject parameters = new JSONObject();
+        parameters.put("type", "OBJECT");
+
+        JSONObject dateProp = new JSONObject().put("type", "STRING").put("description", "The date in yyyy-MM-dd format. Today is " + new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date()));
+        JSONObject availableProp = new JSONObject().put("type", "BOOLEAN");
+
+        parameters.put("properties", new JSONObject().put("date", dateProp).put("isAvailable", availableProp));
+        parameters.put("required", new JSONArray().put("date").put("isAvailable"));
+        functionDeclaration.put("parameters", parameters);
+
+        JSONArray functionDeclarations = new JSONArray().put(functionDeclaration);
+        JSONObject tool = new JSONObject().put("functionDeclarations", functionDeclarations);
+        requestBody.put("tools", new JSONArray().put(tool));
+        return requestBody;
+    }
+
+    private void processResponse(JSONObject responseJson) {
+        handler.post(this::removeLastMessage);
+
+        try {
+            JSONObject candidate = responseJson.optJSONArray("candidates").optJSONObject(0);
+            if (candidate == null) {
+                throw new JSONException("No candidates found in response");
+            }
+
+            JSONObject content = candidate.optJSONObject("content");
+            if (content == null) {
+                // Potentially a safety block or finish reason
+                String finishReason = candidate.optString("finishReason");
+                Log.w(TAG, "No content in candidate, finish reason: " + finishReason);
+                addMessage(CHATBOT_ID, "I am unable to provide a response for that.", 0);
+                return;
+            }
+
+            chatHistory.add(content);
+
+            JSONArray parts = content.optJSONArray("parts");
+            if (parts == null || parts.length() == 0) {
+                throw new JSONException("No parts in content");
+            }
+
+            JSONObject firstPart = parts.getJSONObject(0);
+            JSONObject functionCall = firstPart.optJSONObject("functionCall");
+
+            if (functionCall != null) {
+                handleFunctionCall(functionCall);
+            } else {
+                String textResponse = firstPart.optString("text", "I'm not sure how to respond to that.");
+                handler.post(() -> addMessage(CHATBOT_ID, textResponse, 0));
+            }
+        } catch (JSONException e) {
+            Log.e(TAG, "Error processing JSON response", e);
+            handler.post(() -> addMessage(CHATBOT_ID, "Sorry, I received an invalid response from the AI.", 0));
+        }
+    }
+
+    private void handleFunctionCall(JSONObject functionCall) throws JSONException {
+        String functionName = functionCall.optString("name");
+        if (functionName.equals("updateAvailability")) {
+            JSONObject args = functionCall.optJSONObject("args");
+            if (args == null) {
+                throw new JSONException("Function call arguments are missing");
+            }
+
+            String date = args.optString("date", null);
+            if (date == null || !args.has("isAvailable")) {
+                handler.post(() -> addMessage(CHATBOT_ID, "I'm sorry, I couldn't figure out the details for the schedule update. Please be more specific.", 0));
+                return;
+            }
+            boolean isAvailable = args.getBoolean("isAvailable");
+
+            updateAvailability(date, isAvailable, success -> {
+                try {
+                    JSONObject funcResponse = new JSONObject();
+                    funcResponse.put("role", "function");
+
+                    JSONObject responsePart = new JSONObject();
+                    responsePart.put("name", "updateAvailability");
+                    responsePart.put("response", new JSONObject().put("success", success).put("date", date));
+
+                    funcResponse.put("parts", new JSONArray().put(new JSONObject().put("functionResponse", responsePart)));
+
+                    chatHistory.add(funcResponse);
+                    generateResponse(); // Send result back to AI
+                } catch (JSONException e) {
+                    Log.e(TAG, "Error creating function response", e);
+                }
+            });
+        }
+    }
+
+    private void updateAvailability(String dateString, boolean isAvailable, java.util.function.Consumer<Boolean> callback) {
+        if (isAvailable) {
+            LessonSlot newSlot = new LessonSlot(dateString, "16:00", "20:00", false);
+            teacherRef.update("availableSlots", FieldValue.arrayUnion(newSlot.toMap()))
+                    .addOnSuccessListener(aVoid -> callback.accept(true))
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Error adding availability", e);
+                        callback.accept(false);
+                    });
+        } else {
+            teacherRef.get().addOnSuccessListener(documentSnapshot -> {
+                if (!documentSnapshot.exists()) {
+                    callback.accept(false);
+                    return;
+                }
+
+                Object slotsObject = documentSnapshot.get("availableSlots");
+                if (!(slotsObject instanceof List)) {
+                    callback.accept(true); // Nothing to remove, so it's a success in a way.
+                    return;
+                }
+                List<Map<String, Object>> slots = (List<Map<String, Object>>) slotsObject;
+
+                slots.removeIf(slot -> dateString.equals(slot.get("date")));
+
+                teacherRef.set(Map.of("availableSlots", slots), SetOptions.merge())
+                        .addOnSuccessListener(aVoid -> callback.accept(true))
+                        .addOnFailureListener(e -> {
+                            Log.e(TAG, "Error removing availability", e);
+                            callback.accept(false);
+                        });
+            }).addOnFailureListener(e -> {
+                Log.e(TAG, "Error getting document for removal", e);
+                callback.accept(false);
+            });
+        }
     }
 
     private void addMessage(String senderId, String text, long delay) {
-        new Handler().postDelayed(() -> {
+        handler.postDelayed(() -> {
             Message message = new Message(senderId, text, System.currentTimeMillis());
             messageList.add(message);
             adapter.notifyItemInserted(messageList.size() - 1);
             rvMessages.scrollToPosition(messageList.size() - 1);
         }, delay);
+    }
+
+    private void removeLastMessage() {
+        if (messageList.isEmpty()) return;
+        int lastIndex = messageList.size() - 1;
+        messageList.remove(lastIndex);
+        adapter.notifyItemRemoved(lastIndex);
     }
 
     @Override
