@@ -6,6 +6,7 @@ import android.util.Log;
 import android.widget.Button;
 import android.widget.SearchView;
 import android.widget.TextView;
+import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -52,15 +53,11 @@ public class StudentMainActivity extends AppCompatActivity {
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
-        // Implement the new listener with two methods
         adapter = new TeacherAdapter(filteredTeachers, new TeacherAdapter.OnTeacherClickListener() {
             @Override
             public void onTeacherClick(Teacher teacher) {
-                // Clicking the card opens Booking screen
-                Intent intent = new Intent(StudentMainActivity.this, BookingActivity.class);
-                intent.putExtra("teacherId", teacher.getId());
-                intent.putExtra("teacherName", teacher.getFullName());
-                startActivity(intent);
+                // BookingActivity was removed. For now, do nothing or show a toast.
+                Toast.makeText(StudentMainActivity.this, "Viewing teacher details...", Toast.LENGTH_SHORT).show();
             }
 
             @Override
@@ -119,20 +116,8 @@ public class StudentMainActivity extends AppCompatActivity {
                         String bio = doc.getString("bio");
                         String extraInfo = doc.getString("extraInfo");
 
-                        List<HashMap<String, Object>> slotsFromDb = (List<HashMap<String, Object>>) doc.get("availableSlots");
-                        List<LessonSlot> availableSlots = new ArrayList<>();
-                        if (slotsFromDb != null) {
-                            for (Map<String, Object> slotMap : slotsFromDb) {
-                                availableSlots.add(new LessonSlot(
-                                    (String) slotMap.get("date"),
-                                    (String) slotMap.get("startTime"),
-                                    (String) slotMap.get("endTime"),
-                                    (boolean) slotMap.get("booked")
-                                ));
-                            }
-                        }
-
-                        allTeachers.add(new Teacher(id, name, email, subjects, price, location, bio, extraInfo, availableSlots));
+                        // Construct the Teacher object without availability info
+                        allTeachers.add(new Teacher(id, name, email, subjects, price, location, bio, extraInfo));
                     }
                     filteredTeachers.clear();
                     filteredTeachers.addAll(allTeachers);

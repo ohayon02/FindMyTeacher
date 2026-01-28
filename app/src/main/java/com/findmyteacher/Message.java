@@ -5,7 +5,9 @@ public class Message {
     private String text;
     private long timestamp;
 
-    public Message() {}
+    public Message() {
+        // Default constructor required for calls to DataSnapshot.getValue(Message.class)
+    }
 
     public Message(String senderId, String text, long timestamp) {
         this.senderId = senderId;
@@ -13,7 +15,27 @@ public class Message {
         this.timestamp = timestamp;
     }
 
-    public String getSenderId() { return senderId; }
-    public String getText() { return text; }
-    public long getTimestamp() { return timestamp; }
+    public String getSenderId() {
+        return senderId;
+    }
+
+    public void setSenderId(String senderId) {
+        this.senderId = senderId;
+    }
+
+    public String getText() {
+        return text;
+    }
+
+    public void setText(String text) {
+        this.text = text;
+    }
+
+    public long getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
+    }
 }

@@ -14,7 +14,6 @@ public class TeacherAdapter extends RecyclerView.Adapter<TeacherAdapter.TeacherV
     private List<Teacher> teacherList;
     private OnTeacherClickListener listener;
 
-    // Interface with two methods for two different clicks
     public interface OnTeacherClickListener {
         void onTeacherClick(Teacher teacher);
         void onChatClick(Teacher teacher);
@@ -49,7 +48,7 @@ public class TeacherAdapter extends RecyclerView.Adapter<TeacherAdapter.TeacherV
     }
 
     static class TeacherViewHolder extends RecyclerView.ViewHolder {
-        TextView tvName, tvSubjects, tvPrice, tvLocation, tvBio, tvAvailability;
+        TextView tvName, tvSubjects, tvPrice, tvLocation, tvBio;
         Button btnChat;
 
         public TeacherViewHolder(@NonNull View itemView) {
@@ -58,7 +57,6 @@ public class TeacherAdapter extends RecyclerView.Adapter<TeacherAdapter.TeacherV
             tvSubjects = itemView.findViewById(R.id.tvTeacherSubjects);
             tvPrice = itemView.findViewById(R.id.tvTeacherPrice);
             tvLocation = itemView.findViewById(R.id.tvTeacherLocation);
-            tvAvailability = itemView.findViewById(R.id.tvTeacherAvailability);
             tvBio = itemView.findViewById(R.id.tvTeacherBio);
             btnChat = itemView.findViewById(R.id.btnChatWithTeacher);
         }
@@ -70,7 +68,6 @@ public class TeacherAdapter extends RecyclerView.Adapter<TeacherAdapter.TeacherV
             tvPrice.setText("מחיר לשיעור: " + (price != null && !price.isEmpty() ? price + " ₪" : "לא צוין"));
             String location = teacher.getLocation();
             tvLocation.setText("מיקום: " + (location != null && !location.isEmpty() ? location : "לא צוין"));
-            tvAvailability.setText("זמינות: " + teacher.getAvailabilityString());
             String bio = teacher.getBio();
             tvBio.setText(bio != null && !bio.isEmpty() ? bio : "אין ביוגרפיה זמינה");
 

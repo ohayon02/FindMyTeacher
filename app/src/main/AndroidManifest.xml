@@ -15,19 +15,10 @@
         android:theme="@style/Theme.FindMyTeacher">
 
         <activity
-            android:name=".BookingActivity"
-            android:exported="false" />
-        <activity
-            android:name=".AvailabilityChatbotActivity"
-            android:exported="false" />
-        <activity
             android:name=".TeacherAvailabilityActivity"
             android:exported="false" />
         <activity
             android:name=".TeacherProfileEditActivity"
-            android:exported="false" />
-        <activity
-            android:name=".ChatActivity"
             android:exported="false" />
         <activity
             android:name=".StudentMainActivity"
