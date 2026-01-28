@@ -56,8 +56,10 @@ public class StudentMainActivity extends AppCompatActivity {
         adapter = new TeacherAdapter(filteredTeachers, new TeacherAdapter.OnTeacherClickListener() {
             @Override
             public void onTeacherClick(Teacher teacher) {
-                // BookingActivity was removed. For now, do nothing or show a toast.
-                Toast.makeText(StudentMainActivity.this, "Viewing teacher details...", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(StudentMainActivity.this, BookingActivity.class);
+                intent.putExtra("teacherId", teacher.getId());
+                intent.putExtra("teacherName", teacher.getFullName());
+                startActivity(intent);
             }
 
             @Override

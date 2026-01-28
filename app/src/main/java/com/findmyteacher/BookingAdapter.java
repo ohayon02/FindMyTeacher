@@ -3,76 +3,54 @@ package com.findmyteacher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
-public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.ViewHolder> {
+public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.DateViewHolder> {
 
-    private List<LessonSlot> slots;
-    private OnSlotClickListener listener;
+    private List<String> dateList;
+    private OnDateClickListener listener;
 
-    public interface OnSlotClickListener {
-        void onSlotClick(LessonSlot slot);
+    public interface OnDateClickListener {
+        void onDateClick(String date);
     }
 
-    public BookingAdapter(List<LessonSlot> slots, OnSlotClickListener listener) {
-        this.slots = slots;
+    public BookingAdapter(List<String> dateList, OnDateClickListener listener) {
+        this.dateList = dateList;
         this.listener = listener;
     }
 
     @NonNull
     @Override
-    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_booking_slot, parent, false);
-        return new ViewHolder(view);
+    public DateViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_booking_date, parent, false);
+        return new DateViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        LessonSlot slot = slots.get(position);
-        holder.bind(slot, listener);
+    public void onBindViewHolder(@NonNull DateViewHolder holder, int position) {
+        String date = dateList.get(position);
+        holder.bind(date, listener);
     }
 
     @Override
     public int getItemCount() {
-        return slots.size();
+        return dateList.size();
     }
 
-    static class ViewHolder extends RecyclerView.ViewHolder {
-        private TextView tvSlotDate, tvSlotTime;
-        private Button btnBookSlot;
+    static class DateViewHolder extends RecyclerView.ViewHolder {
+        TextView tvDate;
 
-        public ViewHolder(@NonNull View itemView) {
+        public DateViewHolder(@NonNull View itemView) {
             super(itemView);
-            tvSlotDate = itemView.findViewById(R.id.tvSlotDate);
-            tvSlotTime = itemView.findViewById(R.id.tvSlotTime);
-            btnBookSlot = itemView.findViewById(R.id.btnBookSlot);
+            tvDate = itemView.findViewById(R.id.tvDate);
         }
 
-        public void bind(final LessonSlot slot, final OnSlotClickListener listener) {
-            // Format the date for display
-            SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            SimpleDateFormat outputFormat = new SimpleDateFormat("EEEE, MMMM d", Locale.ENGLISH);
-            try {
-                Date date = inputFormat.parse(slot.getDate());
-                tvSlotDate.setText(outputFormat.format(date));
-            } catch (ParseException e) {
-                tvSlotDate.setText(slot.getDate()); // Fallback to raw date
-            }
-
-            tvSlotTime.setText(String.format("%s - %s", slot.getStartTime(), slot.getEndTime()));
-
-            itemView.findViewById(R.id.btnBookSlot).setOnClickListener(v -> {
-                listener.onSlotClick(slot);
-            });
+        public void bind(final String date, final OnDateClickListener listener) {
+            tvDate.setText(date);
+            itemView.setOnClickListener(v -> listener.onDateClick(date));
         }
     }
 }
