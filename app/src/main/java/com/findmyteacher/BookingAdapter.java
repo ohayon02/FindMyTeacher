@@ -10,8 +10,8 @@ import java.util.List;
 
 public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.DateViewHolder> {
 
-    private List<String> dateList;
-    private OnDateClickListener listener;
+    private final List<String> dateList;
+    private final OnDateClickListener listener;
 
     public interface OnDateClickListener {
         void onDateClick(String date);
@@ -26,13 +26,12 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.DateView
     @Override
     public DateViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_booking_date, parent, false);
-        return new DateViewHolder(view);
+        return new DateViewHolder(view, listener);
     }
 
     @Override
     public void onBindViewHolder(@NonNull DateViewHolder holder, int position) {
-        String date = dateList.get(position);
-        holder.bind(date, listener);
+        holder.bind(dateList.get(position));
     }
 
     @Override
@@ -41,16 +40,21 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.DateView
     }
 
     static class DateViewHolder extends RecyclerView.ViewHolder {
-        TextView tvDate;
+        final TextView tvDate;
 
-        public DateViewHolder(@NonNull View itemView) {
+        public DateViewHolder(@NonNull View itemView, final OnDateClickListener listener) {
             super(itemView);
             tvDate = itemView.findViewById(R.id.tvDate);
+            itemView.setOnClickListener(v -> {
+                int position = getAdapterPosition();
+                if (position != RecyclerView.NO_POSITION) {
+                    listener.onDateClick(tvDate.getText().toString());
+                }
+            });
         }
 
-        public void bind(final String date, final OnDateClickListener listener) {
+        public void bind(final String date) {
             tvDate.setText(date);
-            itemView.setOnClickListener(v -> listener.onDateClick(date));
         }
     }
 }

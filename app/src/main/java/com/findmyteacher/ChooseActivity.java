@@ -27,20 +27,12 @@ public class ChooseActivity extends AppCompatActivity {
         Button loginButton = findViewById(R.id.btnLogin);
         Button registerButton = findViewById(R.id.btnRegister);
 
-        loginButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent intent = new Intent(ChooseActivity.this, Login.class);
-                startActivity(intent);
-            }
-        });
+        View.OnClickListener authListener = v -> {
+            Intent intent = new Intent(ChooseActivity.this, AuthActivity.class);
+            startActivity(intent);
+        };
 
-        registerButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent intent = new Intent(ChooseActivity.this, Register.class);
-                startActivity(intent);
-            }
-        });
+        loginButton.setOnClickListener(authListener);
+        registerButton.setOnClickListener(authListener);
     }
 }

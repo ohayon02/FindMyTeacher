@@ -1,16 +1,24 @@
 package com.findmyteacher;
 
-import java.util.HashMap;
-import java.util.Map;
+import com.google.firebase.firestore.PropertyName;
 
 public class LessonSlot {
+
+    @PropertyName("date")
     private String date;
+
+    @PropertyName("startTime")
     private String startTime;
+
+    @PropertyName("endTime")
     private String endTime;
+
+    @PropertyName("booked")
     private boolean booked;
 
-    // Default constructor required for calls to DataSnapshot.getValue(LessonSlot.class)
-    public LessonSlot() {}
+    public LessonSlot() {
+        // Default constructor required for calls to DataSnapshot.getValue(LessonSlot.class)
+    }
 
     public LessonSlot(String date, String startTime, String endTime, boolean booked) {
         this.date = date;
@@ -19,6 +27,7 @@ public class LessonSlot {
         this.booked = booked;
     }
 
+    @PropertyName("date")
     public String getDate() {
         return date;
     }
@@ -27,6 +36,7 @@ public class LessonSlot {
         this.date = date;
     }
 
+    @PropertyName("startTime")
     public String getStartTime() {
         return startTime;
     }
@@ -35,6 +45,7 @@ public class LessonSlot {
         this.startTime = startTime;
     }
 
+    @PropertyName("endTime")
     public String getEndTime() {
         return endTime;
     }
@@ -43,20 +54,12 @@ public class LessonSlot {
         this.endTime = endTime;
     }
 
+    @PropertyName("booked")
     public boolean isBooked() {
         return booked;
     }
 
     public void setBooked(boolean booked) {
         this.booked = booked;
-    }
-
-    public Map<String, Object> toMap() {
-        HashMap<String, Object> result = new HashMap<>();
-        result.put("date", date);
-        result.put("startTime", startTime);
-        result.put("endTime", endTime);
-        result.put("booked", booked);
-        return result;
     }
 }

@@ -15,6 +15,9 @@
         android:theme="@style/Theme.FindMyTeacher">
 
         <activity
+            android:name=".AuthActivity"
+            android:exported="false" />
+        <activity
             android:name=".BookingActivity"
             android:exported="false" />
         <activity
@@ -28,12 +31,6 @@
             android:exported="false" />
         <activity
             android:name=".TeacherMainActivity"
-            android:exported="false" />
-        <activity
-            android:name=".Register"
-            android:exported="false" />
-        <activity
-            android:name=".Login"
             android:exported="false" />
         <activity
             android:name=".ChooseActivity"

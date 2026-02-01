@@ -1,6 +1,7 @@
 package com.findmyteacher;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
@@ -15,34 +16,33 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import java.util.ArrayList;
 import java.util.List;
 
-public class BookingActivity extends AppCompatActivity {
+public class BookingActivity extends AppCompatActivity implements BookingAdapter.OnDateClickListener {
 
-    private RecyclerView rvAvailableDates;
+    private static final String TAG = "BookingActivity";
+
+    private final List<String> availableDates = new ArrayList<>();
+    private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private BookingAdapter adapter;
-    private List<String> availableDates = new ArrayList<>();
     private TextView tvNoSlots;
-    private FirebaseFirestore db;
-    private String teacherId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_booking);
 
-        db = FirebaseFirestore.getInstance();
-        teacherId = getIntent().getStringExtra("teacherId");
+        String teacherId = getIntent().getStringExtra("teacherId");
         String teacherName = getIntent().getStringExtra("teacherName");
 
         setupToolbar(teacherName);
 
         tvNoSlots = findViewById(R.id.tvNoSlots);
-        rvAvailableDates = findViewById(R.id.rvAvailableDates);
+        RecyclerView rvAvailableDates = findViewById(R.id.rvAvailableDates);
         rvAvailableDates.setLayoutManager(new LinearLayoutManager(this));
 
-        adapter = new BookingAdapter(availableDates, this::onDateClick);
+        adapter = new BookingAdapter(availableDates, this);
         rvAvailableDates.setAdapter(adapter);
 
-        loadAvailableDates();
+        loadAvailableDates(teacherId);
     }
 
     private void setupToolbar(String teacherName) {
@@ -54,31 +54,36 @@ public class BookingActivity extends AppCompatActivity {
         }
     }
 
-    private void loadAvailableDates() {
-        if (teacherId == null) return;
+    @SuppressWarnings("unchecked") // Suppressing warning for Firestore data cast
+    private void loadAvailableDates(String teacherId) {
+        if (teacherId == null) {
+            tvNoSlots.setVisibility(View.VISIBLE);
+            return;
+        }
 
         DocumentReference teacherRef = db.collection("users").document(teacherId);
         teacherRef.get().addOnSuccessListener(documentSnapshot -> {
             if (documentSnapshot.exists() && documentSnapshot.contains("availableDates")) {
                 List<String> datesFromDb = (List<String>) documentSnapshot.get("availableDates");
-                availableDates.clear();
-                if (datesFromDb != null) {
+                if (datesFromDb != null && !datesFromDb.isEmpty()) {
+                    availableDates.clear();
                     availableDates.addAll(datesFromDb);
-                }
-
-                if (availableDates.isEmpty()) {
-                    tvNoSlots.setVisibility(View.VISIBLE);
-                } else {
                     tvNoSlots.setVisibility(View.GONE);
+                } else {
+                    tvNoSlots.setVisibility(View.VISIBLE);
                 }
                 adapter.notifyDataSetChanged();
             } else {
                 tvNoSlots.setVisibility(View.VISIBLE);
             }
+        }).addOnFailureListener(e -> {
+            Log.e(TAG, "Error loading available dates", e);
+            tvNoSlots.setVisibility(View.VISIBLE);
         });
     }
 
-    private void onDateClick(String date) {
+    @Override
+    public void onDateClick(String date) {
         // For now, just show a toast. We will implement the booking logic later.
         Toast.makeText(this, "You selected " + date, Toast.LENGTH_SHORT).show();
     }

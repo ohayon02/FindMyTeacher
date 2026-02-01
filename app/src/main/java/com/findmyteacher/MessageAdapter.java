@@ -8,47 +8,49 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.firebase.auth.FirebaseAuth;
 import java.util.List;
+import java.util.Objects;
 
 public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
-    private static final int TYPE_SENT = 1;
-    private static final int TYPE_RECEIVED = 2;
-    private List<Message> messageList;
-    private String currentUserId;
+    private static final int VIEW_TYPE_SENT = 1;
+    private static final int VIEW_TYPE_RECEIVED = 2;
+
+    private final List<Message> messageList;
+    private final String currentUserId;
 
     public MessageAdapter(List<Message> messageList) {
         this.messageList = messageList;
-        this.currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        this.currentUserId = Objects.requireNonNull(FirebaseAuth.getInstance().getCurrentUser()).getUid();
     }
 
     @Override
     public int getItemViewType(int position) {
         if (messageList.get(position).getSenderId().equals(currentUserId)) {
-            return TYPE_SENT;
+            return VIEW_TYPE_SENT;
         } else {
-            return TYPE_RECEIVED;
+            return VIEW_TYPE_RECEIVED;
         }
     }
 
     @NonNull
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        if (viewType == TYPE_SENT) {
+        if (viewType == VIEW_TYPE_SENT) {
             View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_message_sent, parent, false);
-            return new SentViewHolder(view);
+            return new SentMessageHolder(view);
         } else {
             View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_message_received, parent, false);
-            return new ReceivedViewHolder(view);
+            return new ReceivedMessageHolder(view);
         }
     }
 
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
         Message message = messageList.get(position);
-        if (holder instanceof SentViewHolder) {
-            ((SentViewHolder) holder).tvMessage.setText(message.getText());
+        if (holder.getItemViewType() == VIEW_TYPE_SENT) {
+            ((SentMessageHolder) holder).bind(message);
         } else {
-            ((ReceivedViewHolder) holder).tvMessage.setText(message.getText());
+            ((ReceivedMessageHolder) holder).bind(message);
         }
     }
 
@@ -57,19 +59,29 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         return messageList.size();
     }
 
-    static class SentViewHolder extends RecyclerView.ViewHolder {
-        TextView tvMessage;
-        SentViewHolder(View itemView) {
+    private static class SentMessageHolder extends RecyclerView.ViewHolder {
+        final TextView messageText;
+
+        SentMessageHolder(View itemView) {
             super(itemView);
-            tvMessage = itemView.findViewById(R.id.tvMessageSent);
+            messageText = itemView.findViewById(R.id.tvMessageSent);
+        }
+
+        void bind(Message message) {
+            messageText.setText(message.getText());
         }
     }
 
-    static class ReceivedViewHolder extends RecyclerView.ViewHolder {
-        TextView tvMessage;
-        ReceivedViewHolder(View itemView) {
+    private static class ReceivedMessageHolder extends RecyclerView.ViewHolder {
+        final TextView messageText;
+
+        ReceivedMessageHolder(View itemView) {
             super(itemView);
-            tvMessage = itemView.findViewById(R.id.tvMessageReceived);
+            messageText = itemView.findViewById(R.id.tvMessageReceived);
+        }
+
+        void bind(Message message) {
+            messageText.setText(message.getText());
         }
     }
 }

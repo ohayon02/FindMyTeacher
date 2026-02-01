@@ -7,7 +7,6 @@ import android.widget.CalendarView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.auth.FirebaseAuth;
@@ -18,21 +17,20 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
 public class TeacherAvailabilityActivity extends AppCompatActivity {
 
     private static final String TAG = "TeacherAvailability";
+    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
 
     private CalendarView calendarView;
     private TextView tvSelectedDates;
-    private Button btnExit, btnSaveAvailability;
 
-    private FirebaseFirestore db;
+    private final FirebaseFirestore db = FirebaseFirestore.getInstance();
+    private final FirebaseAuth mAuth = FirebaseAuth.getInstance();
     private DocumentReference teacherRef;
-    private FirebaseAuth mAuth;
 
     private final List<String> selectedDates = new ArrayList<>();
 
@@ -41,35 +39,33 @@ public class TeacherAvailabilityActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_teacher_availability);
 
-        db = FirebaseFirestore.getInstance();
-        mAuth = FirebaseAuth.getInstance();
         FirebaseUser currentUser = mAuth.getCurrentUser();
-
         if (currentUser == null) {
             Toast.makeText(this, "User not logged in", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
-
         teacherRef = db.collection("users").document(currentUser.getUid());
 
-        btnExit = findViewById(R.id.btnExit);
-        btnSaveAvailability = findViewById(R.id.btnSaveAvailability);
+        // Initialize Views
         calendarView = findViewById(R.id.calendarView);
         tvSelectedDates = findViewById(R.id.tvSelectedDates);
+        Button btnExit = findViewById(R.id.btnExit);
+        Button btnSaveAvailability = findViewById(R.id.btnSaveAvailability);
 
+        // Setup Listeners
         btnExit.setOnClickListener(v -> finish());
         btnSaveAvailability.setOnClickListener(v -> saveAvailability());
+        setupCalendarListener();
 
-        setupCalendar();
         loadAvailability();
     }
 
-    private void setupCalendar() {
+    private void setupCalendarListener() {
         calendarView.setOnDateChangeListener((view, year, month, dayOfMonth) -> {
             Calendar calendar = Calendar.getInstance();
             calendar.set(year, month, dayOfMonth);
-            String dateString = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(calendar.getTime());
+            String dateString = DATE_FORMAT.format(calendar.getTime());
 
             if (selectedDates.contains(dateString)) {
                 selectedDates.remove(dateString);
@@ -81,39 +77,32 @@ public class TeacherAvailabilityActivity extends AppCompatActivity {
     }
 
     private void updateSelectedDatesUI() {
-        StringBuilder datesText = new StringBuilder();
-        for (String date : selectedDates) {
-            datesText.append(date).append("\n");
-        }
-        tvSelectedDates.setText(datesText.toString());
+        tvSelectedDates.setText(String.join("\n", selectedDates));
     }
 
     private void saveAvailability() {
-        if (teacherRef != null) {
-            teacherRef.update("availableDates", selectedDates)
-                    .addOnSuccessListener(aVoid -> {
-                        Log.d(TAG, "Availability updated successfully.");
-                        Toast.makeText(TeacherAvailabilityActivity.this, "Availability saved!", Toast.LENGTH_SHORT).show();
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "Error updating availability", e);
-                        Toast.makeText(TeacherAvailabilityActivity.this, "Failed to save availability.", Toast.LENGTH_SHORT).show();
-                    });
-        }
+        teacherRef.update("availableDates", selectedDates)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Availability updated successfully.");
+                    Toast.makeText(TeacherAvailabilityActivity.this, "Availability saved!", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error updating availability", e);
+                    Toast.makeText(TeacherAvailabilityActivity.this, "Failed to save availability.", Toast.LENGTH_SHORT).show();
+                });
     }
 
+    @SuppressWarnings("unchecked") // Suppressing warning for Firestore data cast
     private void loadAvailability() {
-        if (teacherRef != null) {
-            teacherRef.get().addOnSuccessListener(documentSnapshot -> {
-                if (documentSnapshot.exists() && documentSnapshot.contains("availableDates")) {
-                    List<String> loadedDates = (List<String>) documentSnapshot.get("availableDates");
-                    if (loadedDates != null) {
-                        selectedDates.clear();
-                        selectedDates.addAll(loadedDates);
-                        updateSelectedDatesUI();
-                    }
+        teacherRef.get().addOnSuccessListener(documentSnapshot -> {
+            if (documentSnapshot.exists() && documentSnapshot.contains("availableDates")) {
+                List<String> loadedDates = (List<String>) documentSnapshot.get("availableDates");
+                if (loadedDates != null) {
+                    selectedDates.clear();
+                    selectedDates.addAll(loadedDates);
+                    updateSelectedDatesUI();
                 }
-            }).addOnFailureListener(e -> Log.e(TAG, "Error loading availability", e));
-        }
+            }
+        }).addOnFailureListener(e -> Log.e(TAG, "Error loading availability", e));
     }
 }

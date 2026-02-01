@@ -1,8 +1,16 @@
 package com.findmyteacher;
 
+import com.google.firebase.firestore.PropertyName;
+
 public class Message {
+
+    @PropertyName("senderId")
     private String senderId;
+
+    @PropertyName("text")
     private String text;
+
+    @PropertyName("timestamp")
     private long timestamp;
 
     public Message() {
@@ -15,6 +23,7 @@ public class Message {
         this.timestamp = timestamp;
     }
 
+    @PropertyName("senderId")
     public String getSenderId() {
         return senderId;
     }
@@ -23,6 +32,7 @@ public class Message {
         this.senderId = senderId;
     }
 
+    @PropertyName("text")
     public String getText() {
         return text;
     }
@@ -31,6 +41,7 @@ public class Message {
         this.text = text;
     }
 
+    @PropertyName("timestamp")
     public long getTimestamp() {
         return timestamp;
     }

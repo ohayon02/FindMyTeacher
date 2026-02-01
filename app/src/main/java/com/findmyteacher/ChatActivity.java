@@ -12,83 +12,123 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 public class ChatActivity extends AppCompatActivity {
 
     private static final String TAG = "ChatActivity";
-    private RecyclerView rvMessages;
+
+    private final List<Message> messageList = new ArrayList<>();
+    private final FirebaseFirestore db = FirebaseFirestore.getInstance();
+    private final FirebaseAuth mAuth = FirebaseAuth.getInstance();
     private MessageAdapter adapter;
-    private List<Message> messageList;
     private EditText etMessage;
-    private FloatingActionButton btnSend;
-    
-    private FirebaseFirestore db;
-    private FirebaseAuth mAuth;
+    private RecyclerView rvMessages;
+
     private String currentUserId;
-    private String otherUserId;
-    private String chatId;
+    private CollectionReference messagesCollection;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
 
-        db = FirebaseFirestore.getInstance();
-        mAuth = FirebaseAuth.getInstance();
-        
-        if (mAuth.getCurrentUser() == null) {
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null) {
+            Toast.makeText(this, "User not logged in", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
-        currentUserId = mAuth.getCurrentUser().getUid();
+        currentUserId = currentUser.getUid();
 
-        // Get info from intent
-        otherUserId = getIntent().getStringExtra("teacherId");
-        String otherUserName = getIntent().getStringExtra("teacherName");
-        
-        // If otherUserId is null, maybe we came from Teacher side?
+        String otherUserId = getIntent().getStringExtra("teacherId");
+        if (otherUserId == null) otherUserId = getIntent().getStringExtra("studentId");
+
         if (otherUserId == null) {
-            otherUserId = getIntent().getStringExtra("studentId");
-            otherUserName = getIntent().getStringExtra("studentName");
+            Toast.makeText(this, "Error: Chat partner not found", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
         }
 
+        String chatId = generateChatId(currentUserId, otherUserId);
+        messagesCollection = db.collection("chats").document(chatId).collection("messages");
+
+        String chatPartnerName = getIntent().getStringExtra("teacherName");
+        if (chatPartnerName == null) chatPartnerName = getIntent().getStringExtra("studentName");
+
+        setupToolbar(chatPartnerName);
+        setupViews();
+        listenForMessages();
+    }
+
+    private void setupToolbar(String title) {
         Toolbar toolbar = findViewById(R.id.chatToolbar);
         setSupportActionBar(toolbar);
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle(otherUserName != null ? otherUserName : "Chat");
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setDisplayShowHomeEnabled(true);
-        }
+        getSupportActionBar().setTitle(title != null ? title : "Chat");
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+    }
 
+    private void setupViews() {
         rvMessages = findViewById(R.id.rvMessages);
         etMessage = findViewById(R.id.etMessage);
-        btnSend = findViewById(R.id.btnSendMessage);
+        FloatingActionButton btnSend = findViewById(R.id.btnSendMessage);
 
-        messageList = new ArrayList<>();
         adapter = new MessageAdapter(messageList);
-        
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         layoutManager.setStackFromEnd(true);
         rvMessages.setLayoutManager(layoutManager);
         rvMessages.setAdapter(adapter);
 
-        // Unique chatId for this pair
-        if (otherUserId != null) {
-            chatId = generateChatId(currentUserId, otherUserId);
-            listenForMessages();
-        } else {
-            Toast.makeText(this, "Error: User not found", Toast.LENGTH_SHORT).show();
-            finish();
-        }
-
         btnSend.setOnClickListener(v -> sendMessage());
+    }
+
+    private String generateChatId(String id1, String id2) {
+        String[] ids = {id1, id2};
+        Arrays.sort(ids);
+        return ids[0] + "_" + ids[1];
+    }
+
+    private void sendMessage() {
+        String text = etMessage.getText().toString().trim();
+        if (text.isEmpty()) return;
+
+        Message message = new Message(currentUserId, text, System.currentTimeMillis());
+
+        messagesCollection.add(message)
+                .addOnSuccessListener(documentReference -> etMessage.setText(""))
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error sending message", e);
+                    Toast.makeText(this, "Failed to send message", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void listenForMessages() {
+        messagesCollection.orderBy("timestamp", Query.Direction.ASCENDING)
+                .addSnapshotListener((snapshots, error) -> {
+                    if (error != null) {
+                        Log.w(TAG, "Listen failed.", error);
+                        return;
+                    }
+                    if(snapshots == null) return;
+
+                    for (DocumentChange dc : snapshots.getDocumentChanges()) {
+                        if (dc.getType() == DocumentChange.Type.ADDED) {
+                            Message message = dc.getDocument().toObject(Message.class);
+                            messageList.add(message);
+                        }
+                    }
+                    adapter.notifyDataSetChanged();
+                    rvMessages.scrollToPosition(messageList.size() - 1);
+                });
     }
 
     @Override
@@ -98,53 +138,5 @@ public class ChatActivity extends AppCompatActivity {
             return true;
         }
         return super.onOptionsItemSelected(item);
-    }
-
-    private String generateChatId(String id1, String id2) {
-        List<String> ids = new ArrayList<>();
-        ids.add(id1);
-        ids.add(id2);
-        Collections.sort(ids);
-        return ids.get(0) + "_" + ids.get(1);
-    }
-
-    private void sendMessage() {
-        String text = etMessage.getText().toString().trim();
-        if (text.isEmpty()) return;
-
-        Message message = new Message(currentUserId, text, System.currentTimeMillis());
-        
-        db.collection("chats").document(chatId)
-                .collection("messages")
-                .add(message)
-                .addOnSuccessListener(documentReference -> {
-                    etMessage.setText("");
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this, "שגיאה בשליחת הודעה", Toast.LENGTH_SHORT).show();
-                });
-    }
-
-    private void listenForMessages() {
-        db.collection("chats").document(chatId)
-                .collection("messages")
-                .orderBy("timestamp", Query.Direction.ASCENDING)
-                .addSnapshotListener((value, error) -> {
-                    if (error != null) {
-                        Log.w(TAG, "Listen failed.", error);
-                        return;
-                    }
-
-                    if (value != null) {
-                        for (DocumentChange dc : value.getDocumentChanges()) {
-                            if (dc.getType() == DocumentChange.Type.ADDED) {
-                                Message message = dc.getDocument().toObject(Message.class);
-                                messageList.add(message);
-                                adapter.notifyItemInserted(messageList.size() - 1);
-                                rvMessages.scrollToPosition(messageList.size() - 1);
-                            }
-                        }
-                    }
-                });
     }
 }
