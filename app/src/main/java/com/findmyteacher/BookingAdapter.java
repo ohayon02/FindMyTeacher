@@ -7,6 +7,7 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+import com.google.firebase.auth.FirebaseAuth;
 import java.util.List;
 
 public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.DateViewHolder> {
@@ -14,10 +15,12 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.DateView
     public static class BookingDate {
         private final String date;
         private boolean isBooked;
+        private String bookedBy;
 
-        public BookingDate(String date, boolean isBooked) {
+        public BookingDate(String date, boolean isBooked, String bookedBy) {
             this.date = date;
             this.isBooked = isBooked;
+            this.bookedBy = bookedBy;
         }
 
         public String getDate() {
@@ -28,13 +31,22 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.DateView
             return isBooked;
         }
 
+        public String getBookedBy() {
+            return bookedBy;
+        }
+
         public void setBooked(boolean booked) {
             isBooked = booked;
+        }
+
+        public void setBookedBy(String bookedBy) {
+            this.bookedBy = bookedBy;
         }
     }
 
     private final List<BookingDate> dateList;
     private final OnDateClickListener listener;
+    private final String currentUserId;
 
     public interface OnDateClickListener {
         void onDateClick(int position);
@@ -43,6 +55,7 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.DateView
     public BookingAdapter(List<BookingDate> dateList, OnDateClickListener listener) {
         this.dateList = dateList;
         this.listener = listener;
+        this.currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
     }
 
     @NonNull
@@ -55,7 +68,7 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.DateView
     @Override
     public void onBindViewHolder(@NonNull DateViewHolder holder, int position) {
         BookingDate bookingDate = dateList.get(position);
-        holder.bind(bookingDate);
+        holder.bind(bookingDate, currentUserId);
     }
 
     @Override
@@ -77,14 +90,19 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.DateView
             });
         }
 
-        public void bind(final BookingDate bookingDate) {
+        public void bind(final BookingDate bookingDate, String currentUserId) {
             tvDate.setText(bookingDate.getDate());
 
             if (bookingDate.isBooked()) {
-                itemView.setBackgroundColor(Color.GREEN);
-                itemView.setClickable(false);
+                if (currentUserId.equals(bookingDate.getBookedBy())) {
+                    itemView.setBackgroundColor(Color.GREEN); // Booked by current user
+                    itemView.setClickable(true);
+                } else {
+                    itemView.setBackgroundColor(Color.RED); // Booked by another user
+                    itemView.setClickable(false);
+                }
             } else {
-                itemView.setBackgroundResource(android.R.drawable.dialog_holo_light_frame);
+                itemView.setBackgroundResource(android.R.drawable.dialog_holo_light_frame); // Available
                 itemView.setClickable(true);
             }
         }
