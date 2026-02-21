@@ -4,6 +4,8 @@ import com.google.firebase.firestore.PropertyName;
 
 public class Message {
 
+    private String id;
+
     @PropertyName("senderId")
     private String senderId;
 
@@ -21,6 +23,14 @@ public class Message {
         this.senderId = senderId;
         this.text = text;
         this.timestamp = timestamp;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
     }
 
     @PropertyName("senderId")

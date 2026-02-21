@@ -14,25 +14,29 @@
         android:textSize="22sp"
         android:layout_centerHorizontal="true"/>
 
-    <CalendarView
-        android:id="@+id/calendarView"
+    <SearchView
+        android:id="@+id/searchStudents"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/tvWelcomeTeacher"
-        android:layout_marginTop="20dp"/>
+        android:layout_marginTop="16dp"
+        android:queryHint="Search for students..." />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvStudents"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/searchStudents"
+        android:layout_marginTop="8dp"
+        android:layout_above="@id/bottom_nav" />
 
     <LinearLayout
+        android:id="@+id/bottom_nav"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:layout_alignParentBottom="true"
         android:gravity="center">
-
-        <Button
-            android:id="@+id/btnTeacherChats"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Chats" />
 
         <Button
             android:id="@+id/btnManageAvailability"

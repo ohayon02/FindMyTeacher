@@ -13,25 +13,23 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class BookingActivity extends AppCompatActivity implements BookingAdapter.OnDateClickListener {
+public class BookingActivity extends AppCompatActivity implements LessonSlotAdapter.OnSlotClickListener {
 
     private static final String TAG = "BookingActivity";
 
-    private final List<BookingAdapter.BookingDate> dateList = new ArrayList<>();
+    private final List<LessonSlot> lessonSlots = new ArrayList<>();
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
-    private BookingAdapter adapter;
+    private LessonSlotAdapter adapter;
     private TextView tvNoSlots;
     private String teacherId;
-    private ListenerRegistration dateListener;
+    private ListenerRegistration availabilityListener;
     private String currentUserId;
 
     @Override
@@ -46,24 +44,24 @@ public class BookingActivity extends AppCompatActivity implements BookingAdapter
         setupToolbar(teacherName);
 
         tvNoSlots = findViewById(R.id.tvNoSlots);
-        RecyclerView rvAvailableDates = findViewById(R.id.rvAvailableDates);
-        rvAvailableDates.setLayoutManager(new LinearLayoutManager(this));
+        RecyclerView rvAvailableSlots = findViewById(R.id.rvAvailableDates); // Assuming you reuse the same RecyclerView
+        rvAvailableSlots.setLayoutManager(new LinearLayoutManager(this));
 
-        adapter = new BookingAdapter(dateList, this);
-        rvAvailableDates.setAdapter(adapter);
+        adapter = new LessonSlotAdapter(lessonSlots, this);
+        rvAvailableSlots.setAdapter(adapter);
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        setupDateListener();
+        setupAvailabilityListener();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        if (dateListener != null) {
-            dateListener.remove();
+        if (availabilityListener != null) {
+            availabilityListener.remove();
         }
     }
 
@@ -77,14 +75,14 @@ public class BookingActivity extends AppCompatActivity implements BookingAdapter
     }
 
     @SuppressWarnings("unchecked")
-    private void setupDateListener() {
+    private void setupAvailabilityListener() {
         if (teacherId == null) {
             tvNoSlots.setVisibility(View.VISIBLE);
             return;
         }
 
         DocumentReference teacherRef = db.collection("users").document(teacherId);
-        dateListener = teacherRef.addSnapshotListener(this, (documentSnapshot, e) -> {
+        availabilityListener = teacherRef.addSnapshotListener(this, (documentSnapshot, e) -> {
             if (e != null) {
                 Log.e(TAG, "Listen failed.", e);
                 tvNoSlots.setVisibility(View.VISIBLE);
@@ -92,36 +90,29 @@ public class BookingActivity extends AppCompatActivity implements BookingAdapter
             }
 
             if (documentSnapshot != null && documentSnapshot.exists()) {
-                List<String> availableDatesFromDb = (List<String>) documentSnapshot.get("availableDates");
-                Map<String, String> bookedDatesMap = new HashMap<>();
+                Map<String, Map<String, Object>> availability = (Map<String, Map<String, Object>>) documentSnapshot.get("availability");
+                lessonSlots.clear();
 
-                if (documentSnapshot.contains("bookedDates")) {
-                    Object bookedDatesObject = documentSnapshot.get("bookedDates");
-
-                    if (bookedDatesObject instanceof Map) {
-                        // New format: Map<String, String>
-                        Map<String, String> fromDb = (Map<String, String>) bookedDatesObject;
-                        bookedDatesMap.putAll(fromDb);
-                    } else if (bookedDatesObject instanceof List) {
-                        // Old format: List<String>
-                        List<String> fromDb = (List<String>) bookedDatesObject;
-                        for (String date : fromDb) {
-                            // Mark as booked by an unknown user to make it red and un-bookable by others
-                            bookedDatesMap.put(date, "unknown_user_placeholder");
+                if (availability != null && !availability.isEmpty()) {
+                    for (Map.Entry<String, Map<String, Object>> dateEntry : availability.entrySet()) {
+                        String date = dateEntry.getKey();
+                        Map<String, Object> slots = dateEntry.getValue();
+                        for (Map.Entry<String, Object> slotEntry : slots.entrySet()) {
+                            String time = slotEntry.getKey();
+                            Object slotValue = slotEntry.getValue();
+                            if (slotValue instanceof Boolean && (Boolean) slotValue) {
+                                lessonSlots.add(new LessonSlot(date, time, true, null)); // Available
+                            } else if (slotValue instanceof String) {
+                                lessonSlots.add(new LessonSlot(date, time, false, (String) slotValue)); // Booked
+                            }
                         }
                     }
                 }
 
-                dateList.clear();
-                if (availableDatesFromDb != null && !availableDatesFromDb.isEmpty()) {
-                    for (String date : availableDatesFromDb) {
-                        boolean isBooked = bookedDatesMap.containsKey(date);
-                        String bookedBy = isBooked ? bookedDatesMap.get(date) : null;
-                        dateList.add(new BookingAdapter.BookingDate(date, isBooked, bookedBy));
-                    }
-                    tvNoSlots.setVisibility(View.GONE);
-                } else {
+                if (lessonSlots.isEmpty()) {
                     tvNoSlots.setVisibility(View.VISIBLE);
+                } else {
+                    tvNoSlots.setVisibility(View.GONE);
                 }
                 adapter.notifyDataSetChanged();
             } else {
@@ -131,9 +122,10 @@ public class BookingActivity extends AppCompatActivity implements BookingAdapter
         });
     }
 
+
     @Override
-    public void onDateClick(int position) {
-        BookingAdapter.BookingDate selectedDate = dateList.get(position);
+    public void onSlotClick(int position) {
+        LessonSlot selectedSlot = lessonSlots.get(position);
 
         if (teacherId == null) {
             Toast.makeText(this, "Error: Teacher not found.", Toast.LENGTH_SHORT).show();
@@ -141,40 +133,17 @@ public class BookingActivity extends AppCompatActivity implements BookingAdapter
         }
 
         final DocumentReference teacherRef = db.collection("users").document(teacherId);
-        final String date = selectedDate.getDate();
+        final String date = selectedSlot.getDate();
+        final String time = selectedSlot.getTime();
+        final String slotPath = "availability." + date + "." + time;
 
-        if (!selectedDate.isBooked()) {
-            // Book the date - needs careful handling for data migration from List to Map
-            teacherRef.get().addOnSuccessListener(documentSnapshot -> {
-                if (!documentSnapshot.exists()) {
-                    Toast.makeText(BookingActivity.this, "Teacher data not found.", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
-                Object bookedDatesObject = documentSnapshot.get("bookedDates");
-
-                // Case 1: Data is in the old List format. Convert to Map and update.
-                if (bookedDatesObject instanceof List) {
-                    Map<String, String> newBookedDatesMap = new HashMap<>();
-                    for (String d : (List<String>) bookedDatesObject) {
-                        newBookedDatesMap.put(d, "unknown_user_placeholder"); // Preserve old bookings
-                    }
-                    newBookedDatesMap.put(date, currentUserId); // Add the new booking
-                    teacherRef.update("bookedDates", newBookedDatesMap)
-                            .addOnSuccessListener(aVoid -> Toast.makeText(BookingActivity.this, "You have booked " + date, Toast.LENGTH_SHORT).show())
-                            .addOnFailureListener(err -> Toast.makeText(BookingActivity.this, "Booking failed. Please try again.", Toast.LENGTH_SHORT).show());
-                } else {
-                    // Case 2: Data is already a Map or doesn't exist. A simple dot-notation update is safe.
-                    teacherRef.update("bookedDates." + date, currentUserId)
-                            .addOnSuccessListener(aVoid -> Toast.makeText(BookingActivity.this, "You have booked " + date, Toast.LENGTH_SHORT).show())
-                            .addOnFailureListener(err -> Toast.makeText(BookingActivity.this, "Booking failed. Please try again.", Toast.LENGTH_SHORT).show());
-                }
-            }).addOnFailureListener(e -> Toast.makeText(BookingActivity.this, "Could not read teacher data to book.", Toast.LENGTH_SHORT).show());
-
-        } else if (currentUserId.equals(selectedDate.getBookedBy())) {
-            // Unbook the date - this is safe as it operates on a map field
-            teacherRef.update("bookedDates." + date, FieldValue.delete())
-                    .addOnSuccessListener(aVoid -> Toast.makeText(BookingActivity.this, "Booking for " + date + " canceled", Toast.LENGTH_SHORT).show())
+        if (selectedSlot.isAvailable()) {
+            teacherRef.update(slotPath, currentUserId)
+                    .addOnSuccessListener(aVoid -> Toast.makeText(BookingActivity.this, "You have booked " + date + " at " + time, Toast.LENGTH_SHORT).show())
+                    .addOnFailureListener(err -> Toast.makeText(BookingActivity.this, "Booking failed. Please try again.", Toast.LENGTH_SHORT).show());
+        } else if (currentUserId.equals(selectedSlot.getBookedBy())) {
+            teacherRef.update(slotPath, true)
+                    .addOnSuccessListener(aVoid -> Toast.makeText(BookingActivity.this, "Booking for " + date + " at " + time + " canceled", Toast.LENGTH_SHORT).show())
                     .addOnFailureListener(e -> Toast.makeText(BookingActivity.this, "Cancellation failed. Please try again.", Toast.LENGTH_SHORT).show());
         }
     }

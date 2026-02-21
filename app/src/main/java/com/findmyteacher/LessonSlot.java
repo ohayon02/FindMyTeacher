@@ -1,65 +1,31 @@
 package com.findmyteacher;
 
-import com.google.firebase.firestore.PropertyName;
-
 public class LessonSlot {
-
-    @PropertyName("date")
     private String date;
+    private String time;
+    private boolean isAvailable;
+    private String bookedBy;
 
-    @PropertyName("startTime")
-    private String startTime;
-
-    @PropertyName("endTime")
-    private String endTime;
-
-    @PropertyName("booked")
-    private boolean booked;
-
-    public LessonSlot() {
-        // Default constructor required for calls to DataSnapshot.getValue(LessonSlot.class)
-    }
-
-    public LessonSlot(String date, String startTime, String endTime, boolean booked) {
+    public LessonSlot(String date, String time, boolean isAvailable, String bookedBy) {
         this.date = date;
-        this.startTime = startTime;
-        this.endTime = endTime;
-        this.booked = booked;
+        this.time = time;
+        this.isAvailable = isAvailable;
+        this.bookedBy = bookedBy;
     }
 
-    @PropertyName("date")
     public String getDate() {
         return date;
     }
 
-    public void setDate(String date) {
-        this.date = date;
+    public String getTime() {
+        return time;
     }
 
-    @PropertyName("startTime")
-    public String getStartTime() {
-        return startTime;
+    public boolean isAvailable() {
+        return isAvailable;
     }
 
-    public void setStartTime(String startTime) {
-        this.startTime = startTime;
-    }
-
-    @PropertyName("endTime")
-    public String getEndTime() {
-        return endTime;
-    }
-
-    public void setEndTime(String endTime) {
-        this.endTime = endTime;
-    }
-
-    @PropertyName("booked")
-    public boolean isBooked() {
-        return booked;
-    }
-
-    public void setBooked(boolean booked) {
-        this.booked = booked;
+    public String getBookedBy() {
+        return bookedBy;
     }
 }

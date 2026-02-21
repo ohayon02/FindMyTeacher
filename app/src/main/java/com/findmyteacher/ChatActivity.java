@@ -3,36 +3,37 @@ package com.findmyteacher;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.CollectionReference;
-import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 
 public class ChatActivity extends AppCompatActivity {
 
     private static final String TAG = "ChatActivity";
 
-    private final List<Message> messageList = new ArrayList<>();
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final FirebaseAuth mAuth = FirebaseAuth.getInstance();
     private MessageAdapter adapter;
     private EditText etMessage;
     private RecyclerView rvMessages;
+    private ProgressBar progressBar;
 
     private String currentUserId;
     private CollectionReference messagesCollection;
@@ -50,10 +51,12 @@ public class ChatActivity extends AppCompatActivity {
         }
         currentUserId = currentUser.getUid();
 
-        String otherUserId = getIntent().getStringExtra("teacherId");
-        if (otherUserId == null) otherUserId = getIntent().getStringExtra("studentId");
-
+        String otherUserId = getIntent().getStringExtra("studentId");
         if (otherUserId == null) {
+            otherUserId = getIntent().getStringExtra("teacherId");
+        }
+
+        if (otherUserId == null || otherUserId.isEmpty()) {
             Toast.makeText(this, "Error: Chat partner not found", Toast.LENGTH_SHORT).show();
             finish();
             return;
@@ -62,8 +65,10 @@ public class ChatActivity extends AppCompatActivity {
         String chatId = generateChatId(currentUserId, otherUserId);
         messagesCollection = db.collection("chats").document(chatId).collection("messages");
 
-        String chatPartnerName = getIntent().getStringExtra("teacherName");
-        if (chatPartnerName == null) chatPartnerName = getIntent().getStringExtra("studentName");
+        String chatPartnerName = getIntent().getStringExtra("studentName");
+        if (chatPartnerName == null) {
+            chatPartnerName = getIntent().getStringExtra("teacherName");
+        }
 
         setupToolbar(chatPartnerName);
         setupViews();
@@ -80,9 +85,10 @@ public class ChatActivity extends AppCompatActivity {
     private void setupViews() {
         rvMessages = findViewById(R.id.rvMessages);
         etMessage = findViewById(R.id.etMessage);
-        FloatingActionButton btnSend = findViewById(R.id.btnSendMessage);
+        ImageButton btnSend = findViewById(R.id.btnSendMessage);
+        progressBar = findViewById(R.id.progressBar);
 
-        adapter = new MessageAdapter(messageList);
+        adapter = new MessageAdapter(currentUserId);
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         layoutManager.setStackFromEnd(true);
         rvMessages.setLayoutManager(layoutManager);
@@ -112,22 +118,30 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void listenForMessages() {
+        progressBar.setVisibility(View.VISIBLE);
+
         messagesCollection.orderBy("timestamp", Query.Direction.ASCENDING)
                 .addSnapshotListener((snapshots, error) -> {
+                    progressBar.setVisibility(View.GONE);
                     if (error != null) {
-                        Log.w(TAG, "Listen failed.", error);
+                        Log.w(TAG, "Listen for messages failed.", error);
                         return;
                     }
-                    if(snapshots == null) return;
-
-                    for (DocumentChange dc : snapshots.getDocumentChanges()) {
-                        if (dc.getType() == DocumentChange.Type.ADDED) {
-                            Message message = dc.getDocument().toObject(Message.class);
-                            messageList.add(message);
+                    if (snapshots != null && !snapshots.isEmpty()) {
+                        List<Message> messages = new ArrayList<>();
+                        for (QueryDocumentSnapshot doc : snapshots) {
+                            Message message = doc.toObject(Message.class);
+                            message.setId(doc.getId());
+                            messages.add(message);
                         }
+                        adapter.submitList(messages, () -> {
+                            if (adapter.getItemCount() > 0) {
+                                rvMessages.scrollToPosition(adapter.getItemCount() - 1);
+                            }
+                        });
+                    } else {
+                        adapter.submitList(Collections.emptyList());
                     }
-                    adapter.notifyDataSetChanged();
-                    rvMessages.scrollToPosition(messageList.size() - 1);
                 });
     }
 

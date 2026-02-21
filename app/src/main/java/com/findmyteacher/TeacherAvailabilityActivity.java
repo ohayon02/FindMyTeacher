@@ -17,8 +17,10 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class TeacherAvailabilityActivity extends AppCompatActivity {
 
@@ -81,7 +83,16 @@ public class TeacherAvailabilityActivity extends AppCompatActivity {
     }
 
     private void saveAvailability() {
-        teacherRef.update("availableDates", selectedDates)
+        Map<String, Object> availability = new HashMap<>();
+        for (String date : selectedDates) {
+            Map<String, Boolean> slots = new HashMap<>();
+            slots.put("14:00", true);
+            slots.put("15:00", true);
+            slots.put("16:00", true);
+            availability.put(date, slots);
+        }
+
+        teacherRef.update("availability", availability)
                 .addOnSuccessListener(aVoid -> {
                     Log.d(TAG, "Availability updated successfully.");
                     Toast.makeText(TeacherAvailabilityActivity.this, "Availability saved!", Toast.LENGTH_SHORT).show();
@@ -95,11 +106,11 @@ public class TeacherAvailabilityActivity extends AppCompatActivity {
     @SuppressWarnings("unchecked") // Suppressing warning for Firestore data cast
     private void loadAvailability() {
         teacherRef.get().addOnSuccessListener(documentSnapshot -> {
-            if (documentSnapshot.exists() && documentSnapshot.contains("availableDates")) {
-                List<String> loadedDates = (List<String>) documentSnapshot.get("availableDates");
-                if (loadedDates != null) {
+            if (documentSnapshot.exists() && documentSnapshot.contains("availability")) {
+                Map<String, Object> loadedAvailability = (Map<String, Object>) documentSnapshot.get("availability");
+                if (loadedAvailability != null) {
                     selectedDates.clear();
-                    selectedDates.addAll(loadedDates);
+                    selectedDates.addAll(loadedAvailability.keySet());
                     updateSelectedDatesUI();
                 }
             }

@@ -5,27 +5,26 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
-import com.google.firebase.auth.FirebaseAuth;
-import java.util.List;
 import java.util.Objects;
 
-public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+public class MessageAdapter extends ListAdapter<Message, RecyclerView.ViewHolder> {
 
     private static final int VIEW_TYPE_SENT = 1;
     private static final int VIEW_TYPE_RECEIVED = 2;
 
-    private final List<Message> messageList;
     private final String currentUserId;
 
-    public MessageAdapter(List<Message> messageList) {
-        this.messageList = messageList;
-        this.currentUserId = Objects.requireNonNull(FirebaseAuth.getInstance().getCurrentUser()).getUid();
+    public MessageAdapter(String currentUserId) {
+        super(DIFF_CALLBACK);
+        this.currentUserId = currentUserId;
     }
 
     @Override
     public int getItemViewType(int position) {
-        if (messageList.get(position).getSenderId().equals(currentUserId)) {
+        if (Objects.equals(getItem(position).getSenderId(), currentUserId)) {
             return VIEW_TYPE_SENT;
         } else {
             return VIEW_TYPE_RECEIVED;
@@ -46,17 +45,12 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-        Message message = messageList.get(position);
+        Message message = getItem(position);
         if (holder.getItemViewType() == VIEW_TYPE_SENT) {
             ((SentMessageHolder) holder).bind(message);
         } else {
             ((ReceivedMessageHolder) holder).bind(message);
         }
-    }
-
-    @Override
-    public int getItemCount() {
-        return messageList.size();
     }
 
     private static class SentMessageHolder extends RecyclerView.ViewHolder {
@@ -84,4 +78,16 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             messageText.setText(message.getText());
         }
     }
+
+    private static final DiffUtil.ItemCallback<Message> DIFF_CALLBACK = new DiffUtil.ItemCallback<Message>() {
+        @Override
+        public boolean areItemsTheSame(@NonNull Message oldItem, @NonNull Message newItem) {
+            return Objects.equals(oldItem.getId(), newItem.getId());
+        }
+
+        @Override
+        public boolean areContentsTheSame(@NonNull Message oldItem, @NonNull Message newItem) {
+            return Objects.equals(oldItem.getText(), newItem.getText());
+        }
+    };
 }
