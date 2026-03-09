@@ -33,13 +33,20 @@ public class LessonSlotAdapter extends RecyclerView.Adapter<LessonSlotAdapter.Sl
     @Override
     public void onBindViewHolder(@NonNull SlotViewHolder holder, int position) {
         LessonSlot slot = slots.get(position);
-        holder.tvDate.setText(slot.getDate());
         holder.tvTime.setText(slot.getTime());
-
+        
         if (slot.isAvailable()) {
-            holder.itemView.setBackgroundColor(Color.parseColor("#A5D6A7")); // Light Green
+            holder.tvStatus.setText("פנוי");
+            holder.tvStatus.setTextColor(Color.parseColor("#4CAF50"));
+            holder.tvStudentName.setText("אין תלמיד רשום");
         } else {
-            holder.itemView.setBackgroundColor(Color.parseColor("#EF9A9A")); // Light Red
+            holder.tvStatus.setText("קבוע");
+            holder.tvStatus.setTextColor(Color.parseColor("#F44336"));
+            String displayName = slot.getStudentName();
+            if (displayName == null || displayName.isEmpty()) {
+                displayName = "טוען שם...";
+            }
+            holder.tvStudentName.setText("תלמיד: " + displayName);
         }
     }
 
@@ -49,13 +56,14 @@ public class LessonSlotAdapter extends RecyclerView.Adapter<LessonSlotAdapter.Sl
     }
 
     static class SlotViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
-        TextView tvDate, tvTime;
+        TextView tvTime, tvStatus, tvStudentName;
         OnSlotClickListener onSlotClickListener;
 
         public SlotViewHolder(@NonNull View itemView, OnSlotClickListener onSlotClickListener) {
             super(itemView);
-            tvDate = itemView.findViewById(R.id.tvDate);
             tvTime = itemView.findViewById(R.id.tvTime);
+            tvStatus = itemView.findViewById(R.id.tvStatus);
+            tvStudentName = itemView.findViewById(R.id.tvStudentName);
             this.onSlotClickListener = onSlotClickListener;
             itemView.setOnClickListener(this);
         }

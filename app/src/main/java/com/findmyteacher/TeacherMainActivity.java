@@ -36,6 +36,7 @@ public class TeacherMainActivity extends AppCompatActivity {
         tvWelcome = findViewById(R.id.tvWelcomeTeacher);
         Button btnLogout = findViewById(R.id.btnLogout);
         Button btnManageAvailability = findViewById(R.id.btnManageAvailability);
+        Button btnMyLessons = findViewById(R.id.btnMyLessons);
         Button btnInfo = findViewById(R.id.btnInfo);
         RecyclerView recyclerView = findViewById(R.id.rvStudents);
         SearchView searchView = findViewById(R.id.searchStudents);
@@ -44,6 +45,11 @@ public class TeacherMainActivity extends AppCompatActivity {
 
         btnLogout.setOnClickListener(v -> logoutUser());
         btnManageAvailability.setOnClickListener(v -> startActivity(new Intent(this, TeacherAvailabilityActivity.class)));
+        btnMyLessons.setOnClickListener(v -> {
+            // כאן נפתח את הפעילות החדשה של הקלנדר/רשימת שיעורים
+            Toast.makeText(this, "פתיחת לוח שיעורים...", Toast.LENGTH_SHORT).show();
+            startActivity(new Intent(this, TeacherLessonsActivity.class));
+        });
         btnInfo.setOnClickListener(v -> startActivity(new Intent(this, TeacherProfileEditActivity.class)));
 
         setupRecyclerView(recyclerView);
@@ -90,7 +96,6 @@ public class TeacherMainActivity extends AppCompatActivity {
     private void loadUserData() {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser == null) {
-            // If user data can't be loaded, the session is likely invalid.
             logoutUser();
             return;
         }
@@ -99,6 +104,14 @@ public class TeacherMainActivity extends AppCompatActivity {
                 .addOnSuccessListener(doc -> {
                     if (doc.exists()) {
                         tvWelcome.setText("Welcome, Teacher " + doc.getString("fullName"));
+                        
+                        // בדיקה אם המורה הגדיר מחיר ומיקום
+                        String price = doc.getString("hourlyPrice");
+                        String location = doc.getString("location");
+                        if (price == null || price.isEmpty() || location == null || location.isEmpty()) {
+                            Toast.makeText(this, "אנא הגדר מחיר ומיקום בפרופיל שלך!", Toast.LENGTH_LONG).show();
+                            startActivity(new Intent(this, TeacherProfileEditActivity.class));
+                        }
                     }
                 })
                 .addOnFailureListener(e -> Log.e(TAG, "Error loading user data", e));

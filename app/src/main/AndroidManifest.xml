@@ -3,8 +3,11 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
+        android:name=".MyApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -22,6 +25,9 @@
             android:exported="false" />
         <activity
             android:name=".ChatActivity"
+            android:exported="false" />
+        <activity
+            android:name=".TeacherLessonsActivity"
             android:exported="false" />
         <activity
             android:name=".TeacherAvailabilityActivity"
@@ -43,6 +49,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <receiver android:name=".LessonReminderReceiver" android:exported="false" />
+
     </application>
 
 </manifest>

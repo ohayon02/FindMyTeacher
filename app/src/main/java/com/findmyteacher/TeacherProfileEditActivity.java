@@ -2,8 +2,10 @@ package com.findmyteacher;
 
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import com.google.firebase.auth.FirebaseAuth;
@@ -22,6 +24,7 @@ public class TeacherProfileEditActivity extends AppCompatActivity {
     private DocumentReference teacherRef;
 
     private EditText etPrice, etLocation, etBio, etExtraInfo;
+    private TextView tvPriceRecommendation;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,11 +48,14 @@ public class TeacherProfileEditActivity extends AppCompatActivity {
         etLocation = findViewById(R.id.etLocation);
         etBio = findViewById(R.id.etBio);
         etExtraInfo = findViewById(R.id.etExtraInfo);
+        tvPriceRecommendation = findViewById(R.id.tvPriceRecommendation);
         Button btnSave = findViewById(R.id.btnSaveProfile);
         Button btnCancel = findViewById(R.id.btnCancel);
+        Button btnGetAiPrice = findViewById(R.id.btnGetAiPriceRecommendation);
 
         btnSave.setOnClickListener(v -> saveProfile());
         btnCancel.setOnClickListener(v -> finish());
+        btnGetAiPrice.setOnClickListener(v -> getAiPriceRecommendation());
     }
 
     private void loadCurrentProfile() {
@@ -63,10 +69,34 @@ public class TeacherProfileEditActivity extends AppCompatActivity {
         }).addOnFailureListener(e -> Log.e(TAG, "Error loading profile", e));
     }
 
+    private void getAiPriceRecommendation() {
+        // סימולציה של AI - המלצה לפי מיקום וביוגרפיה (במערכת אמיתית נשתמש ב-Gemini API)
+        String location = etLocation.getText().toString().trim();
+        int basePrice = 120;
+        
+        if (location.toLowerCase().contains("תל אביב") || location.toLowerCase().contains("מרכז")) {
+            basePrice += 40;
+        }
+        
+        String recommendation = "המלצת AI: לפי המיקום והתחום שלך, מחיר מומלץ הוא " + basePrice + " - " + (basePrice + 30) + " ש\"ח.";
+        tvPriceRecommendation.setText(recommendation);
+        tvPriceRecommendation.setVisibility(View.VISIBLE);
+        etPrice.setText(String.valueOf(basePrice));
+    }
+
     private void saveProfile() {
+        String price = etPrice.getText().toString().trim();
+        String location = etLocation.getText().toString().trim();
+
+        // חובה להגדיר מחיר וכתובת
+        if (price.isEmpty() || location.isEmpty()) {
+            Toast.makeText(this, "חובה להזין מחיר ומיקום!", Toast.LENGTH_LONG).show();
+            return;
+        }
+
         Map<String, Object> profileData = new HashMap<>();
-        profileData.put("hourlyPrice", etPrice.getText().toString().trim());
-        profileData.put("location", etLocation.getText().toString().trim());
+        profileData.put("hourlyPrice", price);
+        profileData.put("location", location);
         profileData.put("bio", etBio.getText().toString().trim());
         profileData.put("extraInfo", etExtraInfo.getText().toString().trim());
 
