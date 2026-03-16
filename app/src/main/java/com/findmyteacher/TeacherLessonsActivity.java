@@ -1,5 +1,6 @@
 package com.findmyteacher;
 
+import android.app.ProgressDialog;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
@@ -182,13 +183,30 @@ public class TeacherLessonsActivity extends AppCompatActivity {
         if (slot.isAvailable()) return;
         
         String studentName = slot.getStudentName() != null ? slot.getStudentName() : "התלמיד";
-        String report = "🤖 דוח מצב תלמיד (AI) עבור " + studentName + ":\n" +
-                "התלמיד גילה התקדמות משמעותית בשיעור האחרון.\n" +
-                "מומלץ להתמקד בתרגול נוסף של החומר הנלמד בשיעור ב-" + slot.getTime() + ".\n" +
-                "ציון התמדה משוער: 85%";
         
+        ProgressDialog pd = new ProgressDialog(this);
+        pd.setMessage("מייצר דוח AI עבור " + studentName + "...");
+        pd.setCancelable(false);
+        pd.show();
+
+        GeminiAIHelper.generateReport(studentName, slot.getTime(), new GeminiAIHelper.AICallback() {
+            @Override
+            public void onResponse(String response) {
+                pd.dismiss();
+                showReportDialog(response);
+            }
+
+            @Override
+            public void onError(Exception e) {
+                pd.dismiss();
+                Toast.makeText(TeacherLessonsActivity.this, "שגיאה ביצירת דוח: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private void showReportDialog(String report) {
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
-        builder.setTitle("דוח התקדמות AI")
+        builder.setTitle("🤖 דוח התקדמות AI")
                .setMessage(report)
                .setPositiveButton("הבנתי", null)
                .show();

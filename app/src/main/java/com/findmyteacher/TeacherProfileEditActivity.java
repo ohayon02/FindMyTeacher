@@ -1,5 +1,6 @@
 package com.findmyteacher;
 
+import android.app.ProgressDialog;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -12,7 +13,11 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class TeacherProfileEditActivity extends AppCompatActivity {
@@ -25,6 +30,7 @@ public class TeacherProfileEditActivity extends AppCompatActivity {
 
     private EditText etPrice, etLocation, etBio, etExtraInfo;
     private TextView tvPriceRecommendation;
+    private String currentSubjects = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,30 +71,69 @@ public class TeacherProfileEditActivity extends AppCompatActivity {
                 etLocation.setText(doc.getString("location"));
                 etBio.setText(doc.getString("bio"));
                 etExtraInfo.setText(doc.getString("extraInfo"));
+                
+                // שליפת מקצועות לצורך ה-AI
+                List<Map<String, String>> subjects = (List<Map<String, String>>) doc.get("subjects");
+                if (subjects != null) {
+                    StringBuilder sb = new StringBuilder();
+                    for (Map<String, String> s : subjects) {
+                        sb.append(s.get("subject")).append(", ");
+                    }
+                    currentSubjects = sb.toString();
+                }
             }
         }).addOnFailureListener(e -> Log.e(TAG, "Error loading profile", e));
     }
 
     private void getAiPriceRecommendation() {
-        // סימולציה של AI - המלצה לפי מיקום וביוגרפיה (במערכת אמיתית נשתמש ב-Gemini API)
         String location = etLocation.getText().toString().trim();
-        int basePrice = 120;
-        
-        if (location.toLowerCase().contains("תל אביב") || location.toLowerCase().contains("מרכז")) {
-            basePrice += 40;
+        String bio = etBio.getText().toString().trim();
+
+        if (location.isEmpty()) {
+            Toast.makeText(this, "אנא הזן מיקום כדי לקבל המלצה מדויקת", Toast.LENGTH_SHORT).show();
+            return;
         }
-        
-        String recommendation = "המלצת AI: לפי המיקום והתחום שלך, מחיר מומלץ הוא " + basePrice + " - " + (basePrice + 30) + " ש\"ח.";
-        tvPriceRecommendation.setText(recommendation);
-        tvPriceRecommendation.setVisibility(View.VISIBLE);
-        etPrice.setText(String.valueOf(basePrice));
+
+        ProgressDialog pd = new ProgressDialog(this);
+        pd.setMessage("Gemini AI מנתח מחירי שוק ומחשב המלצה...");
+        pd.show();
+
+        // שליפת מחירים של מורים אחרים באזור
+        db.collection("users")
+                .whereEqualTo("userType", "teacher")
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    List<Integer> otherPrices = new ArrayList<>();
+                    for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                        String priceStr = doc.getString("hourlyPrice");
+                        if (priceStr != null && !priceStr.isEmpty()) {
+                            try {
+                                otherPrices.add(Integer.parseInt(priceStr));
+                            } catch (NumberFormatException ignored) {}
+                        }
+                    }
+
+                    GeminiAIHelper.getPriceRecommendation(location, bio, currentSubjects, otherPrices, new GeminiAIHelper.AICallback() {
+                        @Override
+                        public void onResponse(String response) {
+                            pd.dismiss();
+                            tvPriceRecommendation.setText(response);
+                            tvPriceRecommendation.setVisibility(View.VISIBLE);
+                        }
+
+                        @Override
+                        public void onError(Exception e) {
+                            pd.dismiss();
+                            Toast.makeText(TeacherProfileEditActivity.this, "שגיאה בחיבור ל-AI", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                });
     }
 
     private void saveProfile() {
         String price = etPrice.getText().toString().trim();
         String location = etLocation.getText().toString().trim();
 
-        // חובה להגדיר מחיר וכתובת
         if (price.isEmpty() || location.isEmpty()) {
             Toast.makeText(this, "חובה להזין מחיר ומיקום!", Toast.LENGTH_LONG).show();
             return;
