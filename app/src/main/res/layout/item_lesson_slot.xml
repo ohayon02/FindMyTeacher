@@ -44,5 +44,15 @@
             android:textColor="#555555"
             android:textSize="16sp" />
 
+        <Button
+            android:id="@+id/btnCancelLesson"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end"
+            android:text="ביטול שיעור"
+            android:textColor="#D32F2F"
+            android:visibility="gone" />
+
     </LinearLayout>
 </androidx.cardview.widget.CardView>

@@ -4,16 +4,22 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.SearchView;
 import android.widget.TextView;
+import android.widget.Toast;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -22,9 +28,12 @@ public class StudentMainActivity extends AppCompatActivity {
 
     private static final String TAG = "StudentMainActivity";
 
-    private TeacherAdapter adapter;
+    private TeacherAdapter teacherAdapter;
+    private LessonSlotAdapter myLessonsAdapter;
     private final List<Teacher> allTeachers = new ArrayList<>();
     private final List<Teacher> filteredTeachers = new ArrayList<>();
+    private final List<LessonSlot> myBookedLessons = new ArrayList<>();
+    
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final FirebaseAuth mAuth = FirebaseAuth.getInstance();
     private TextView tvWelcome;
@@ -35,21 +44,60 @@ public class StudentMainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_student_main);
 
         tvWelcome = findViewById(R.id.tvWelcomeUser);
-        Button btnLogout = findViewById(R.id.btnLogout);
-        RecyclerView recyclerView = findViewById(R.id.rvTeachers);
+        ImageButton btnLogout = findViewById(R.id.btnLogout);
+        RecyclerView rvTeachers = findViewById(R.id.rvTeachers);
+        RecyclerView rvMyLessons = findViewById(R.id.rvMyLessons);
         SearchView searchView = findViewById(R.id.searchTeachers);
+        Button btnReportProgress = findViewById(R.id.btnReportProgress);
 
         loadUserData();
         btnLogout.setOnClickListener(v -> logoutUser());
+        btnReportProgress.setOnClickListener(v -> showProgressReportDialog());
 
-        setupRecyclerView(recyclerView);
-        loadTeachers();
+        setupTeachersRecyclerView(rvTeachers);
+        setupMyLessonsRecyclerView(rvMyLessons);
+        
+        loadTeachersAndMyLessons();
         setupSearchView(searchView);
+        
+        NotificationHelper.createNotificationChannel(this);
     }
 
-    private void setupRecyclerView(RecyclerView recyclerView) {
+    private void showProgressReportDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("איך הולך לך בלימודים?");
+        
+        final EditText input = new EditText(this);
+        input.setHint("כתוב כאן איך אתה מרגיש עם החומר, קשיים או הצלחות...");
+        builder.setView(input);
+
+        builder.setPositiveButton("שלח למורים", (dialog, which) -> {
+            String feedback = input.getText().toString();
+            if (!feedback.isEmpty()) {
+                saveStudentFeedback(feedback);
+            }
+        });
+        builder.setNegativeButton("ביטול", (dialog, which) -> dialog.cancel());
+
+        builder.show();
+    }
+
+    private void saveStudentFeedback(String feedback) {
+        String uid = mAuth.getUid();
+        if (uid == null) return;
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("lastFeedback", feedback);
+        data.put("feedbackTimestamp", System.currentTimeMillis());
+
+        db.collection("users").document(uid).update(data)
+                .addOnSuccessListener(aVoid -> Toast.makeText(this, "המשוב נשמר ויוצג למורים שלך", Toast.LENGTH_SHORT).show())
+                .addOnFailureListener(e -> Toast.makeText(this, "שגיאה בשמירת המשוב", Toast.LENGTH_SHORT).show());
+    }
+
+    private void setupTeachersRecyclerView(RecyclerView recyclerView) {
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new TeacherAdapter(filteredTeachers, (teacher, isChat) -> {
+        teacherAdapter = new TeacherAdapter(filteredTeachers, (teacher, isChat) -> {
             Intent intent;
             if (isChat) {
                 intent = new Intent(StudentMainActivity.this, ChatActivity.class);
@@ -60,7 +108,45 @@ public class StudentMainActivity extends AppCompatActivity {
             intent.putExtra("teacherName", teacher.getFullName());
             startActivity(intent);
         });
-        recyclerView.setAdapter(adapter);
+        recyclerView.setAdapter(teacherAdapter);
+    }
+
+    private void setupMyLessonsRecyclerView(RecyclerView recyclerView) {
+        recyclerView.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
+        myLessonsAdapter = new LessonSlotAdapter(myBookedLessons, position -> {
+            // No action needed for general click
+        });
+        myLessonsAdapter.setStudentView(true);
+        myLessonsAdapter.setOnCancelClickListener(position -> {
+            showCancelConfirmation(position);
+        });
+        recyclerView.setAdapter(myLessonsAdapter);
+    }
+
+    private void showCancelConfirmation(int position) {
+        LessonSlot slot = myBookedLessons.get(position);
+        new AlertDialog.Builder(this)
+                .setTitle("ביטול שיעור")
+                .setMessage("האם אתה בטוח שברצונך לבטל את השיעור עם " + slot.getStudentName() + " בתאריך " + slot.getDate() + " בשעה " + slot.getTime() + "?")
+                .setPositiveButton("כן, בטל", (dialog, which) -> cancelLesson(slot))
+                .setNegativeButton("לא", null)
+                .show();
+    }
+
+    private void cancelLesson(LessonSlot slot) {
+        String teacherId = slot.getTeacherId();
+        if (teacherId == null) return;
+
+        db.collection("users").document(teacherId)
+                .update("availability." + slot.getDate() + "." + slot.getTime(), FieldValue.delete())
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "השיעור בוטל בהצלחה", Toast.LENGTH_SHORT).show();
+                    loadTeachersAndMyLessons(); // Refresh the list
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error cancelling lesson", e);
+                    Toast.makeText(this, "שגיאה בביטול השיעור", Toast.LENGTH_SHORT).show();
+                });
     }
 
     private void setupSearchView(SearchView searchView) {
@@ -85,21 +171,45 @@ public class StudentMainActivity extends AppCompatActivity {
 
         db.collection("users").document(currentUser.getUid()).get().addOnSuccessListener(doc -> {
             if (doc.exists()) {
-                tvWelcome.setText("Welcome, " + doc.getString("fullName"));
+                tvWelcome.setText("שלום, " + doc.getString("fullName"));
             }
         }).addOnFailureListener(e -> Log.e(TAG, "Error loading user data", e));
     }
 
-    private void loadTeachers() {
+    private void loadTeachersAndMyLessons() {
+        String currentUserId = mAuth.getUid();
+        if (currentUserId == null) return;
+
         db.collection("users").whereEqualTo("userType", "teacher").get()
                 .addOnSuccessListener(queryDocumentSnapshots -> {
                     allTeachers.clear();
+                    myBookedLessons.clear();
+                    
                     for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
-                        allTeachers.add(doc.toObject(Teacher.class));
+                        Teacher t = doc.toObject(Teacher.class);
+                        t.setId(doc.getId());
+                        allTeachers.add(t);
+
+                        // Extract my lessons from this teacher
+                        Map<String, Map<String, Object>> availability = (Map<String, Map<String, Object>>) doc.get("availability");
+                        if (availability != null) {
+                            for (Map.Entry<String, Map<String, Object>> dateEntry : availability.entrySet()) {
+                                String date = dateEntry.getKey();
+                                for (Map.Entry<String, Object> slotEntry : dateEntry.getValue().entrySet()) {
+                                    if (currentUserId.equals(slotEntry.getValue())) {
+                                        LessonSlot slot = new LessonSlot(date, slotEntry.getKey(), false, currentUserId);
+                                        slot.setStudentName(t.getFullName()); // Using studentName field to store teacher name for display
+                                        slot.setTeacherId(t.getId());
+                                        myBookedLessons.add(slot);
+                                    }
+                                }
+                            }
+                        }
                     }
-                    filterTeachers(""); // Initially show all teachers
+                    filterTeachers(""); 
+                    myLessonsAdapter.notifyDataSetChanged();
                 })
-                .addOnFailureListener(e -> Log.e(TAG, "Error loading teachers", e));
+                .addOnFailureListener(e -> Log.e(TAG, "Error loading data", e));
     }
 
     private void filterTeachers(String query) {
@@ -109,12 +219,12 @@ public class StudentMainActivity extends AppCompatActivity {
         } else {
             String lowerCaseQuery = query.toLowerCase();
             List<Teacher> result = allTeachers.stream()
-                    .filter(t -> t.getFullName().toLowerCase().contains(lowerCaseQuery) ||
-                                 t.getSubjectsString().toLowerCase().contains(lowerCaseQuery))
+                    .filter(t -> (t.getFullName() != null && t.getFullName().toLowerCase().contains(lowerCaseQuery)) ||
+                                 (t.getSubjectsString() != null && t.getSubjectsString().toLowerCase().contains(lowerCaseQuery)))
                     .collect(Collectors.toList());
             filteredTeachers.addAll(result);
         }
-        adapter.notifyDataSetChanged();
+        teacherAdapter.notifyDataSetChanged();
     }
 
     private void logoutUser() {

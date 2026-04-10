@@ -13,7 +13,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import java.util.ArrayList;
@@ -29,6 +28,7 @@ public class BookingActivity extends AppCompatActivity implements LessonSlotAdap
     private LessonSlotAdapter adapter;
     private TextView tvNoSlots;
     private String teacherId;
+    private String teacherName;
     private ListenerRegistration availabilityListener;
     private String currentUserId;
 
@@ -38,13 +38,13 @@ public class BookingActivity extends AppCompatActivity implements LessonSlotAdap
         setContentView(R.layout.activity_booking);
 
         teacherId = getIntent().getStringExtra("teacherId");
-        String teacherName = getIntent().getStringExtra("teacherName");
+        teacherName = getIntent().getStringExtra("teacherName");
         currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
 
         setupToolbar(teacherName);
 
         tvNoSlots = findViewById(R.id.tvNoSlots);
-        RecyclerView rvAvailableSlots = findViewById(R.id.rvAvailableDates); // Assuming you reuse the same RecyclerView
+        RecyclerView rvAvailableSlots = findViewById(R.id.rvAvailableDates);
         rvAvailableSlots.setLayoutManager(new LinearLayoutManager(this));
 
         adapter = new LessonSlotAdapter(lessonSlots, this);
@@ -69,7 +69,7 @@ public class BookingActivity extends AppCompatActivity implements LessonSlotAdap
         Toolbar toolbar = findViewById(R.id.bookingToolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle("Book with " + teacherName);
+            getSupportActionBar().setTitle("קביעת שיעור עם " + (teacherName != null ? teacherName : "המורה"));
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
     }
@@ -100,10 +100,16 @@ public class BookingActivity extends AppCompatActivity implements LessonSlotAdap
                         for (Map.Entry<String, Object> slotEntry : slots.entrySet()) {
                             String time = slotEntry.getKey();
                             Object slotValue = slotEntry.getValue();
+                            
                             if (slotValue instanceof Boolean && (Boolean) slotValue) {
-                                lessonSlots.add(new LessonSlot(date, time, true, null)); // Available
+                                // Slot is available
+                                lessonSlots.add(new LessonSlot(date, time, true, null));
                             } else if (slotValue instanceof String) {
-                                lessonSlots.add(new LessonSlot(date, time, false, (String) slotValue)); // Booked
+                                String bookedBy = (String) slotValue;
+                                // Show only if booked by the current user
+                                if (currentUserId.equals(bookedBy)) {
+                                    lessonSlots.add(new LessonSlot(date, time, false, bookedBy));
+                                }
                             }
                         }
                     }
@@ -116,19 +122,17 @@ public class BookingActivity extends AppCompatActivity implements LessonSlotAdap
                 }
                 adapter.notifyDataSetChanged();
             } else {
-                Log.d(TAG, "Current data: null");
                 tvNoSlots.setVisibility(View.VISIBLE);
             }
         });
     }
-
 
     @Override
     public void onSlotClick(int position) {
         LessonSlot selectedSlot = lessonSlots.get(position);
 
         if (teacherId == null) {
-            Toast.makeText(this, "Error: Teacher not found.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "שגיאה: מורה לא נמצא", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -139,12 +143,15 @@ public class BookingActivity extends AppCompatActivity implements LessonSlotAdap
 
         if (selectedSlot.isAvailable()) {
             teacherRef.update(slotPath, currentUserId)
-                    .addOnSuccessListener(aVoid -> Toast.makeText(BookingActivity.this, "You have booked " + date + " at " + time, Toast.LENGTH_SHORT).show())
-                    .addOnFailureListener(err -> Toast.makeText(BookingActivity.this, "Booking failed. Please try again.", Toast.LENGTH_SHORT).show());
+                    .addOnSuccessListener(aVoid -> {
+                        Toast.makeText(BookingActivity.this, "השיעור נקבע בהצלחה ל-" + date + " בשעה " + time, Toast.LENGTH_SHORT).show();
+                        NotificationHelper.scheduleLessonReminder(this, date, time, teacherName);
+                    })
+                    .addOnFailureListener(err -> Toast.makeText(BookingActivity.this, "הזמנה נכשלה", Toast.LENGTH_SHORT).show());
         } else if (currentUserId.equals(selectedSlot.getBookedBy())) {
             teacherRef.update(slotPath, true)
-                    .addOnSuccessListener(aVoid -> Toast.makeText(BookingActivity.this, "Booking for " + date + " at " + time + " canceled", Toast.LENGTH_SHORT).show())
-                    .addOnFailureListener(e -> Toast.makeText(BookingActivity.this, "Cancellation failed. Please try again.", Toast.LENGTH_SHORT).show());
+                    .addOnSuccessListener(aVoid -> Toast.makeText(BookingActivity.this, "השיעור בוטל", Toast.LENGTH_SHORT).show())
+                    .addOnFailureListener(e -> Toast.makeText(BookingActivity.this, "ביטול נכשל", Toast.LENGTH_SHORT).show());
         }
     }
 

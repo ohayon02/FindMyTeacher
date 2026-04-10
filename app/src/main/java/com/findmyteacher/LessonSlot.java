@@ -6,6 +6,7 @@ public class LessonSlot {
     private boolean isAvailable;
     private String bookedBy;
     private String studentName;
+    private String teacherId;
 
     public LessonSlot(String date, String time, boolean isAvailable, String bookedBy) {
         this.date = date;
@@ -36,5 +37,13 @@ public class LessonSlot {
 
     public void setStudentName(String studentName) {
         this.studentName = studentName;
+    }
+
+    public String getTeacherId() {
+        return teacherId;
+    }
+
+    public void setTeacherId(String teacherId) {
+        this.teacherId = teacherId;
     }
 }

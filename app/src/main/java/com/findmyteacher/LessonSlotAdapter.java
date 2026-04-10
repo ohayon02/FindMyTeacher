@@ -4,6 +4,7 @@ import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -13,14 +14,28 @@ public class LessonSlotAdapter extends RecyclerView.Adapter<LessonSlotAdapter.Sl
 
     private final List<LessonSlot> slots;
     private final OnSlotClickListener listener;
+    private OnCancelClickListener cancelListener;
+    private boolean isStudentView = false;
 
     public interface OnSlotClickListener {
         void onSlotClick(int position);
     }
 
+    public interface OnCancelClickListener {
+        void onCancelClick(int position);
+    }
+
     public LessonSlotAdapter(List<LessonSlot> slots, OnSlotClickListener listener) {
         this.slots = slots;
         this.listener = listener;
+    }
+
+    public void setOnCancelClickListener(OnCancelClickListener cancelListener) {
+        this.cancelListener = cancelListener;
+    }
+
+    public void setStudentView(boolean studentView) {
+        isStudentView = studentView;
     }
 
     @NonNull
@@ -39,15 +54,29 @@ public class LessonSlotAdapter extends RecyclerView.Adapter<LessonSlotAdapter.Sl
             holder.tvStatus.setText("פנוי");
             holder.tvStatus.setTextColor(Color.parseColor("#4CAF50"));
             holder.tvStudentName.setText("אין תלמיד רשום");
+            holder.btnCancel.setVisibility(View.GONE);
         } else {
             holder.tvStatus.setText("קבוע");
             holder.tvStatus.setTextColor(Color.parseColor("#F44336"));
             String displayName = slot.getStudentName();
             if (displayName == null || displayName.isEmpty()) {
-                displayName = "טוען שם...";
+                displayName = "טוען...";
             }
-            holder.tvStudentName.setText("תלמיד: " + displayName);
+            
+            if (isStudentView) {
+                holder.tvStudentName.setText("מורה: " + displayName);
+                holder.btnCancel.setVisibility(View.VISIBLE);
+            } else {
+                holder.tvStudentName.setText("תלמיד: " + displayName);
+                holder.btnCancel.setVisibility(View.GONE);
+            }
         }
+
+        holder.btnCancel.setOnClickListener(v -> {
+            if (cancelListener != null) {
+                cancelListener.onCancelClick(position);
+            }
+        });
     }
 
     @Override
@@ -57,6 +86,7 @@ public class LessonSlotAdapter extends RecyclerView.Adapter<LessonSlotAdapter.Sl
 
     static class SlotViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
         TextView tvTime, tvStatus, tvStudentName;
+        Button btnCancel;
         OnSlotClickListener onSlotClickListener;
 
         public SlotViewHolder(@NonNull View itemView, OnSlotClickListener onSlotClickListener) {
@@ -64,6 +94,7 @@ public class LessonSlotAdapter extends RecyclerView.Adapter<LessonSlotAdapter.Sl
             tvTime = itemView.findViewById(R.id.tvTime);
             tvStatus = itemView.findViewById(R.id.tvStatus);
             tvStudentName = itemView.findViewById(R.id.tvStudentName);
+            btnCancel = itemView.findViewById(R.id.btnCancelLesson);
             this.onSlotClickListener = onSlotClickListener;
             itemView.setOnClickListener(this);
         }
