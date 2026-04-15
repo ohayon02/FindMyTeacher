@@ -56,7 +56,6 @@ public class TeacherLessonsActivity extends AppCompatActivity {
         
         setupRecyclerView();
         
-        // תאריך ברירת מחדל - היום
         Calendar today = Calendar.getInstance();
         selectedDate = dateFormat.format(today.getTime());
         calendarView.setSelectedDate(CalendarDay.today());
@@ -94,7 +93,7 @@ public class TeacherLessonsActivity extends AppCompatActivity {
                         
                         if (availability != null) {
                             for (Map.Entry<String, Map<String, Object>> dateEntry : availability.entrySet()) {
-                                String dateStr = dateEntry.getKey(); // yyyy-MM-dd
+                                String dateStr = dateEntry.getKey();
                                 Map<String, Object> slots = dateEntry.getValue();
                                 
                                 for (Map.Entry<String, Object> slotEntry : slots.entrySet()) {
@@ -116,22 +115,15 @@ public class TeacherLessonsActivity extends AppCompatActivity {
                                         fetchStudentName(slot);
                                         try {
                                             String[] parts = dateStr.split("-");
-                                            int year = Integer.parseInt(parts[0]);
-                                            int month = Integer.parseInt(parts[1]);
-                                            int day = Integer.parseInt(parts[2]);
-                                            datesWithLessons.add(CalendarDay.from(year, month, day));
-                                        } catch (Exception e) {
-                                            Log.e(TAG, "Error parsing date: " + dateStr, e);
-                                        }
+                                            datesWithLessons.add(CalendarDay.from(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2])));
+                                        } catch (Exception ignored) {}
                                     }
                                 }
                             }
                         }
                     }
-                    
                     calendarView.removeDecorators();
                     calendarView.addDecorator(new EventDecorator(Color.GREEN, datesWithLessons));
-                    
                     filterLessonsByDate();
                 })
                 .addOnFailureListener(e -> Log.e(TAG, "Error loading lessons", e));
@@ -154,11 +146,8 @@ public class TeacherLessonsActivity extends AppCompatActivity {
                         if (name == null) name = "תלמיד ללא שם";
                         studentNamesCache.put(studentId, name);
                         slot.setStudentName(name);
-                        // עדכון כל הסלוטים של אותו תלמיד
                         for (LessonSlot s : allLessons) {
-                            if (studentId.equals(s.getBookedBy())) {
-                                s.setStudentName(name);
-                            }
+                            if (studentId.equals(s.getBookedBy())) s.setStudentName(name);
                         }
                         adapter.notifyDataSetChanged();
                     }
@@ -168,15 +157,9 @@ public class TeacherLessonsActivity extends AppCompatActivity {
     private void filterLessonsByDate() {
         filteredLessons.clear();
         for (LessonSlot slot : allLessons) {
-            if (slot.getDate().equals(selectedDate)) {
-                filteredLessons.add(slot);
-            }
+            if (slot.getDate().equals(selectedDate)) filteredLessons.add(slot);
         }
         adapter.notifyDataSetChanged();
-        
-        if (filteredLessons.isEmpty()) {
-            Toast.makeText(this, "אין שיעורים בתאריך זה", Toast.LENGTH_SHORT).show();
-        }
     }
 
     private void generateAiReport(LessonSlot slot) {
@@ -189,7 +172,8 @@ public class TeacherLessonsActivity extends AppCompatActivity {
         pd.setCancelable(false);
         pd.show();
 
-        GeminiAIHelper.generateReport(studentName, slot.getTime(), new GeminiAIHelper.AICallback() {
+        // הוספתי את הפרמטר 'this' כ-Context
+        GeminiAIHelper.generateReport(this, studentName, slot.getTime(), new GeminiAIHelper.AICallback() {
             @Override
             public void onResponse(String response) {
                 pd.dismiss();
@@ -205,8 +189,8 @@ public class TeacherLessonsActivity extends AppCompatActivity {
     }
 
     private void showReportDialog(String report) {
-        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
-        builder.setTitle("🤖 דוח התקדמות AI")
+        new android.app.AlertDialog.Builder(this)
+               .setTitle("🤖 דוח התקדמות AI")
                .setMessage(report)
                .setPositiveButton("הבנתי", null)
                .show();
@@ -215,20 +199,8 @@ public class TeacherLessonsActivity extends AppCompatActivity {
     public static class EventDecorator implements DayViewDecorator {
         private final int color;
         private final HashSet<CalendarDay> dates;
-
-        public EventDecorator(int color, Collection<CalendarDay> dates) {
-            this.color = color;
-            this.dates = new HashSet<>(dates);
-        }
-
-        @Override
-        public boolean shouldDecorate(CalendarDay day) {
-            return dates.contains(day);
-        }
-
-        @Override
-        public void decorate(DayViewFacade view) {
-            view.addSpan(new DotSpan(10, color));
-        }
+        public EventDecorator(int color, Collection<CalendarDay> dates) { this.color = color; this.dates = new HashSet<>(dates); }
+        @Override public boolean shouldDecorate(CalendarDay day) { return dates.contains(day); }
+        @Override public void decorate(DayViewFacade view) { view.addSpan(new DotSpan(10, color)); }
     }
 }

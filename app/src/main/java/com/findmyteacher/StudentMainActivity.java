@@ -4,7 +4,6 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.SearchView;
 import android.widget.TextView;
@@ -19,7 +18,6 @@ import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -37,6 +35,7 @@ public class StudentMainActivity extends AppCompatActivity {
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final FirebaseAuth mAuth = FirebaseAuth.getInstance();
     private TextView tvWelcome;
+    private String userFullName = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,7 +51,11 @@ public class StudentMainActivity extends AppCompatActivity {
 
         loadUserData();
         btnLogout.setOnClickListener(v -> logoutUser());
-        btnReportProgress.setOnClickListener(v -> showProgressReportDialog());
+        
+        // עכשיו פותח ישירות את הצאט עם ה-AI
+        btnReportProgress.setOnClickListener(v -> {
+            startActivity(new Intent(this, AiChatActivity.class));
+        });
 
         setupTeachersRecyclerView(rvTeachers);
         setupMyLessonsRecyclerView(rvMyLessons);
@@ -61,38 +64,6 @@ public class StudentMainActivity extends AppCompatActivity {
         setupSearchView(searchView);
         
         NotificationHelper.createNotificationChannel(this);
-    }
-
-    private void showProgressReportDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("איך הולך לך בלימודים?");
-        
-        final EditText input = new EditText(this);
-        input.setHint("כתוב כאן איך אתה מרגיש עם החומר, קשיים או הצלחות...");
-        builder.setView(input);
-
-        builder.setPositiveButton("שלח למורים", (dialog, which) -> {
-            String feedback = input.getText().toString();
-            if (!feedback.isEmpty()) {
-                saveStudentFeedback(feedback);
-            }
-        });
-        builder.setNegativeButton("ביטול", (dialog, which) -> dialog.cancel());
-
-        builder.show();
-    }
-
-    private void saveStudentFeedback(String feedback) {
-        String uid = mAuth.getUid();
-        if (uid == null) return;
-
-        Map<String, Object> data = new HashMap<>();
-        data.put("lastFeedback", feedback);
-        data.put("feedbackTimestamp", System.currentTimeMillis());
-
-        db.collection("users").document(uid).update(data)
-                .addOnSuccessListener(aVoid -> Toast.makeText(this, "המשוב נשמר ויוצג למורים שלך", Toast.LENGTH_SHORT).show())
-                .addOnFailureListener(e -> Toast.makeText(this, "שגיאה בשמירת המשוב", Toast.LENGTH_SHORT).show());
     }
 
     private void setupTeachersRecyclerView(RecyclerView recyclerView) {
@@ -171,7 +142,8 @@ public class StudentMainActivity extends AppCompatActivity {
 
         db.collection("users").document(currentUser.getUid()).get().addOnSuccessListener(doc -> {
             if (doc.exists()) {
-                tvWelcome.setText("שלום, " + doc.getString("fullName"));
+                userFullName = doc.getString("fullName");
+                tvWelcome.setText("שלום, " + userFullName);
             }
         }).addOnFailureListener(e -> Log.e(TAG, "Error loading user data", e));
     }

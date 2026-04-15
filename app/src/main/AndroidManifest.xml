@@ -27,6 +27,9 @@
             android:name=".ChatActivity"
             android:exported="false" />
         <activity
+            android:name=".AiChatActivity"
+            android:exported="false" />
+        <activity
             android:name=".TeacherLessonsActivity"
             android:exported="false" />
         <activity

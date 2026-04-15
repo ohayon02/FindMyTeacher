@@ -129,18 +129,16 @@ public class TeacherMainActivity extends AppCompatActivity {
         pd.setCancelable(false);
         pd.show();
 
-        // Get student's feedback from Firestore
         db.collection("users").document(student.getId()).get().addOnSuccessListener(doc -> {
             String feedback = doc.getString("lastFeedback");
             
-            // Collect lesson dates for this student
             List<String> lessonDates = allLessons.stream()
                     .filter(l -> student.getId().equals(l.getBookedBy()))
                     .map(LessonSlot::getDate)
                     .distinct()
                     .collect(Collectors.toList());
 
-            GeminiAIHelper.generateStudentProgressReport(student.getFullName(), feedback, lessonDates, new GeminiAIHelper.AICallback() {
+            GeminiAIHelper.generateStudentProgressReport(this, student.getFullName(), feedback, lessonDates, true, new GeminiAIHelper.AICallback() {
                 @Override
                 public void onResponse(String response) {
                     pd.dismiss();
@@ -150,7 +148,7 @@ public class TeacherMainActivity extends AppCompatActivity {
                 @Override
                 public void onError(Exception e) {
                     pd.dismiss();
-                    Toast.makeText(TeacherMainActivity.this, "שגיאה ביצירת דוח", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(TeacherMainActivity.this, "שגיאה ביצירת דוח: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 }
             });
         });
@@ -195,7 +193,9 @@ public class TeacherMainActivity extends AppCompatActivity {
                 if (e != null) return;
                 if (doc != null && doc.exists()) {
                     TextView tvWelcome = findViewById(R.id.tvWelcomeTeacher);
-                    tvWelcome.setText("שלום, " + doc.getString("fullName"));
+                    if (tvWelcome != null) {
+                        tvWelcome.setText("שלום, " + doc.getString("fullName"));
+                    }
                     updateLessonsFromDoc(doc);
                 }
             });
@@ -230,7 +230,6 @@ public class TeacherMainActivity extends AppCompatActivity {
     }
 
     private void scheduleNotification(LessonSlot slot) {
-        // Schedule reminder for the teacher
         String sid = slot.getBookedBy();
         if (sid == null) return;
         
@@ -294,14 +293,14 @@ public class TeacherMainActivity extends AppCompatActivity {
         ProgressDialog pd = new ProgressDialog(this);
         pd.setMessage("מייצר דוח שיעור...");
         pd.show();
-        GeminiAIHelper.generateReport(slot.getStudentName(), slot.getTime(), new GeminiAIHelper.AICallback() {
+        GeminiAIHelper.generateReport(this, slot.getStudentName(), slot.getTime(), new GeminiAIHelper.AICallback() {
             @Override public void onResponse(String r) {
                 pd.dismiss();
                 new AlertDialog.Builder(TeacherMainActivity.this).setTitle("סיכום שיעור AI").setMessage(r).show();
             }
             @Override public void onError(Exception e) {
                 pd.dismiss();
-                Toast.makeText(TeacherMainActivity.this, "שגיאה ב-AI", Toast.LENGTH_SHORT).show();
+                Toast.makeText(TeacherMainActivity.this, "שגיאה ב-AI: " + e.getMessage(), Toast.LENGTH_LONG).show();
             }
         });
     }

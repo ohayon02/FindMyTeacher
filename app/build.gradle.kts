@@ -6,7 +6,6 @@ plugins {
     alias(libs.plugins.google.services)
 }
 
-// Read the local.properties file
 val localProperties = Properties()
 val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
@@ -26,7 +25,6 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Expose the API key from local.properties to BuildConfig
         val apiKey = localProperties.getProperty("API_KEY") ?: ""
         buildConfigField("String", "API_KEY", "\"$apiKey\"")
     }
@@ -54,6 +52,10 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.auth)
+    
+    // SDK הישיר של Google AI - תומך במפתח מ-local.properties
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+    implementation("com.google.guava:guava:33.0.0-android")
 
     implementation(libs.appcompat)
     implementation(libs.material)
@@ -65,6 +67,4 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
-
-    // No more external AI libraries
 }

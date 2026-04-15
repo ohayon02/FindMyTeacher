@@ -73,11 +73,15 @@ public class TeacherProfileEditActivity extends AppCompatActivity {
                 etExtraInfo.setText(doc.getString("extraInfo"));
                 
                 // שליפת מקצועות לצורך ה-AI
-                List<Map<String, String>> subjects = (List<Map<String, String>>) doc.get("subjects");
-                if (subjects != null) {
+                Object subjectsObj = doc.get("subjects");
+                if (subjectsObj instanceof List) {
+                    List<?> subjects = (List<?>) subjectsObj;
                     StringBuilder sb = new StringBuilder();
-                    for (Map<String, String> s : subjects) {
-                        sb.append(s.get("subject")).append(", ");
+                    for (Object s : subjects) {
+                        if (s instanceof Map) {
+                            Map<String, String> map = (Map<String, String>) s;
+                            sb.append(map.get("subject")).append(", ");
+                        }
                     }
                     currentSubjects = sb.toString();
                 }
@@ -113,7 +117,7 @@ public class TeacherProfileEditActivity extends AppCompatActivity {
                         }
                     }
 
-                    GeminiAIHelper.getPriceRecommendation(location, bio, currentSubjects, otherPrices, new GeminiAIHelper.AICallback() {
+                    GeminiAIHelper.getPriceRecommendation(this, location, bio, currentSubjects, otherPrices, new GeminiAIHelper.AICallback() {
                         @Override
                         public void onResponse(String response) {
                             pd.dismiss();
