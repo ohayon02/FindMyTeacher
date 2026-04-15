@@ -49,25 +49,24 @@ public class LessonSlotAdapter extends RecyclerView.Adapter<LessonSlotAdapter.Sl
     public void onBindViewHolder(@NonNull SlotViewHolder holder, int position) {
         LessonSlot slot = slots.get(position);
         holder.tvTime.setText(slot.getTime());
+        holder.tvDate.setText(slot.getDate()); // הצגת התאריך
         
         if (slot.isAvailable()) {
-            holder.tvStatus.setText("פנוי");
+            holder.tvStatus.setText("פנוי לקביעה");
             holder.tvStatus.setTextColor(Color.parseColor("#4CAF50"));
-            holder.tvStudentName.setText("אין תלמיד רשום");
+            holder.tvStudentName.setText(""); 
             holder.btnCancel.setVisibility(View.GONE);
         } else {
-            holder.tvStatus.setText("קבוע");
-            holder.tvStatus.setTextColor(Color.parseColor("#F44336"));
-            String displayName = slot.getStudentName();
-            if (displayName == null || displayName.isEmpty()) {
-                displayName = "טוען...";
-            }
+            holder.tvStatus.setText("השיעור שלך");
+            holder.tvStatus.setTextColor(Color.parseColor("#2196F3"));
             
+            String displayName = slot.getStudentName(); 
             if (isStudentView) {
-                holder.tvStudentName.setText("מורה: " + displayName);
+                holder.tvStudentName.setText("עם: " + (displayName != null ? displayName : "המורה"));
                 holder.btnCancel.setVisibility(View.VISIBLE);
+                holder.btnCancel.setText("ביטול שיעור");
             } else {
-                holder.tvStudentName.setText("תלמיד: " + displayName);
+                holder.tvStudentName.setText("תלמיד: " + (displayName != null ? displayName : "טוען..."));
                 holder.btnCancel.setVisibility(View.GONE);
             }
         }
@@ -75,6 +74,8 @@ public class LessonSlotAdapter extends RecyclerView.Adapter<LessonSlotAdapter.Sl
         holder.btnCancel.setOnClickListener(v -> {
             if (cancelListener != null) {
                 cancelListener.onCancelClick(position);
+            } else {
+                listener.onSlotClick(position);
             }
         });
     }
@@ -85,13 +86,14 @@ public class LessonSlotAdapter extends RecyclerView.Adapter<LessonSlotAdapter.Sl
     }
 
     static class SlotViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
-        TextView tvTime, tvStatus, tvStudentName;
+        TextView tvTime, tvStatus, tvStudentName, tvDate;
         Button btnCancel;
         OnSlotClickListener onSlotClickListener;
 
         public SlotViewHolder(@NonNull View itemView, OnSlotClickListener onSlotClickListener) {
             super(itemView);
             tvTime = itemView.findViewById(R.id.tvTime);
+            tvDate = itemView.findViewById(R.id.tvLessonDate); // חיבור התאריך
             tvStatus = itemView.findViewById(R.id.tvStatus);
             tvStudentName = itemView.findViewById(R.id.tvStudentName);
             btnCancel = itemView.findViewById(R.id.btnCancelLesson);

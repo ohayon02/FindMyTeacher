@@ -21,7 +21,8 @@ import java.util.concurrent.Executor;
 
 public class GeminiManager {
     private static GeminiManager instance;
-    private static final String modelVersion = "gemini-2.5-flash";
+    // תיקון שם המודל לגרסה קיימת ותקינה
+    private static final String modelVersion = "gemini-1.5-flash";
     private static final String TAG = "GeminiManager";
 
     private GeminiManager() {}
