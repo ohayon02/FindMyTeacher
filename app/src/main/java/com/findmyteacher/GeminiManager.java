@@ -20,7 +20,7 @@ public class GeminiManager {
     // תיקון: חזרה למודל gemini-pro שהוא היציב ביותר עבור גרסה 0.9.0 ומונע שגיאות 404
     private static final String modelVersion = "gemini-pro"; 
     private static final String TAG = "GeminiManager";
-
+//
     private GeminiManager() {}
 
     public static GeminiManager getInstance() {
