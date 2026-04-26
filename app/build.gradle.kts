@@ -53,7 +53,7 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.auth)
     
-    // SDK הישיר של Google AI - תומך במפתח מ-local.properties
+    // הגרסה היציבה שעוברת Sync
     implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
     implementation("com.google.guava:guava:33.0.0-android")
 
