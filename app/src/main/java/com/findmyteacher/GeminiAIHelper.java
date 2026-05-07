@@ -21,7 +21,6 @@ public class GeminiAIHelper {
     private static final String TAG = "GeminiAIHelper";
     private static final String API_KEY = BuildConfig.API_KEY;
     
-    // שימוש בשם המודל היציב ביותר למניעת שגיאות "Not Found"
     private static final String MODEL_NAME = "gemini-2.5-flash";
     private static final String GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL_NAME + ":generateContent?key=" + API_KEY;
 
