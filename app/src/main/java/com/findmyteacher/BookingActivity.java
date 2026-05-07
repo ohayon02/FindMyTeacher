@@ -39,7 +39,10 @@ public class BookingActivity extends AppCompatActivity implements LessonSlotAdap
 
         teacherId = getIntent().getStringExtra("teacherId");
         teacherName = getIntent().getStringExtra("teacherName");
-        currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        
+        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+            currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        }
 
         setupToolbar(teacherName);
 
@@ -48,6 +51,7 @@ public class BookingActivity extends AppCompatActivity implements LessonSlotAdap
         rvAvailableSlots.setLayoutManager(new LinearLayoutManager(this));
 
         adapter = new LessonSlotAdapter(lessonSlots, this);
+        adapter.setStudentView(true); // מגדיר תצוגת תלמיד כדי לראות "מורה: ..."
         rvAvailableSlots.setAdapter(adapter);
     }
 
@@ -76,7 +80,7 @@ public class BookingActivity extends AppCompatActivity implements LessonSlotAdap
 
     @SuppressWarnings("unchecked")
     private void setupAvailabilityListener() {
-        if (teacherId == null) {
+        if (teacherId == null || currentUserId == null) {
             tvNoSlots.setVisibility(View.VISIBLE);
             return;
         }
@@ -102,13 +106,17 @@ public class BookingActivity extends AppCompatActivity implements LessonSlotAdap
                             Object slotValue = slotEntry.getValue();
                             
                             if (slotValue instanceof Boolean && (Boolean) slotValue) {
-                                // Slot is available
-                                lessonSlots.add(new LessonSlot(date, time, true, null));
+                                // שיעור פנוי
+                                LessonSlot slot = new LessonSlot(date, time, true, null);
+                                slot.setStudentName(teacherName); // בשביל ה-UI של התלמיד
+                                lessonSlots.add(slot);
                             } else if (slotValue instanceof String) {
                                 String bookedBy = (String) slotValue;
-                                // Show only if booked by the current user
+                                // מציג לתלמיד רק אם הוא זה שהזמין, כדי שיוכל לבטל
                                 if (currentUserId.equals(bookedBy)) {
-                                    lessonSlots.add(new LessonSlot(date, time, false, bookedBy));
+                                    LessonSlot slot = new LessonSlot(date, time, false, bookedBy);
+                                    slot.setStudentName(teacherName);
+                                    lessonSlots.add(slot);
                                 }
                             }
                         }
@@ -117,6 +125,7 @@ public class BookingActivity extends AppCompatActivity implements LessonSlotAdap
 
                 if (lessonSlots.isEmpty()) {
                     tvNoSlots.setVisibility(View.VISIBLE);
+                    tvNoSlots.setText("אין שיעורים פנויים כרגע");
                 } else {
                     tvNoSlots.setVisibility(View.GONE);
                 }
@@ -129,6 +138,8 @@ public class BookingActivity extends AppCompatActivity implements LessonSlotAdap
 
     @Override
     public void onSlotClick(int position) {
+        if (position < 0 || position >= lessonSlots.size()) return;
+        
         LessonSlot selectedSlot = lessonSlots.get(position);
 
         if (teacherId == null) {
@@ -144,14 +155,21 @@ public class BookingActivity extends AppCompatActivity implements LessonSlotAdap
         if (selectedSlot.isAvailable()) {
             teacherRef.update(slotPath, currentUserId)
                     .addOnSuccessListener(aVoid -> {
-                        Toast.makeText(BookingActivity.this, "השיעור נקבע בהצלחה ל-" + date + " בשעה " + time, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(BookingActivity.this, "השיעור נקבע בהצלחה", Toast.LENGTH_SHORT).show();
                         NotificationHelper.scheduleLessonReminder(this, date, time, teacherName);
                     })
                     .addOnFailureListener(err -> Toast.makeText(BookingActivity.this, "הזמנה נכשלה", Toast.LENGTH_SHORT).show());
         } else if (currentUserId.equals(selectedSlot.getBookedBy())) {
-            teacherRef.update(slotPath, true)
-                    .addOnSuccessListener(aVoid -> Toast.makeText(BookingActivity.this, "השיעור בוטל", Toast.LENGTH_SHORT).show())
-                    .addOnFailureListener(e -> Toast.makeText(BookingActivity.this, "ביטול נכשל", Toast.LENGTH_SHORT).show());
+            // התלמיד לוחץ על שיעור שהוא כבר הזמין - נשאל אם לבטל
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("ביטול שיעור")
+                    .setMessage("האם ברצונך לבטל את השיעור שקבעת?")
+                    .setPositiveButton("כן, בטל", (dialog, which) -> {
+                        teacherRef.update(slotPath, true)
+                                .addOnSuccessListener(aVoid -> Toast.makeText(BookingActivity.this, "השיעור בוטל", Toast.LENGTH_SHORT).show());
+                    })
+                    .setNegativeButton("לא", null)
+                    .show();
         }
     }
 

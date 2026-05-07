@@ -8,9 +8,11 @@ material = "1.13.0"
 activity = "1.11.0"
 constraintlayout = "2.2.1"
 googleServices = "4.4.2"
-firebaseBom = "33.5.1"
 materialCalendarView = "2.0.1"
 threetenabp = "1.4.9"
+firebase-bom = "34.4.0"
+guava = "31.0.1-android"
+reactivestreams = "1.0.4"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -20,11 +22,18 @@ appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "a
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
 constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
-firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
-firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
-firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 material-calendarview = { group = "com.github.prolificinteractive", name = "material-calendarview", version.ref = "materialCalendarView" }
 threetenabp = { group = "com.jakewharton.threetenabp", name = "threetenabp", version.ref = "threetenabp" }
+
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
+firebase-auth = { module = "com.google.firebase:firebase-auth" }
+firebase-firestore = { module = "com.google.firebase:firebase-firestore" }
+firebase-ai = { module = "com.google.firebase:firebase-ai" }
+
+
+# ספריות נוספות עם גרסה ישירה
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+reactive-streams = { module = "org.reactivestreams:reactive-streams", version.ref = "reactivestreams" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
