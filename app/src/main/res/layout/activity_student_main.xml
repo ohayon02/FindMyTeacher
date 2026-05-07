@@ -9,17 +9,20 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@android:color/white"
-        app:elevation="0dp">
+        app:elevation="2dp">
 
-        <androidx.appcompat.widget.Toolbar
-            android:id="@+id/toolbar"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize">
+            android:layout_height="160dp"
+            android:orientation="vertical"
+            android:paddingLeft="20dp"
+            android:paddingRight="20dp"
+            android:paddingBottom="20dp"
+            android:gravity="bottom">
 
             <RelativeLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_marginEnd="16dp">
+                android:layout_height="wrap_content">
 
                 <TextView
                     android:id="@+id/tvWelcomeUser"
@@ -28,20 +31,23 @@
                     android:layout_centerVertical="true"
                     android:text="שלום, טוען..."
                     android:textColor="#333333"
-                    android:textSize="18sp"
+                    android:textSize="22sp"
                     android:textStyle="bold" />
 
-                <ImageButton
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnLogout"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
                     android:layout_alignParentEnd="true"
                     android:layout_centerVertical="true"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@android:drawable/ic_lock_power_off"
-                    app:tint="#D32F2F" />
+                    android:text="התנתק"
+                    android:textColor="#D32F2F"
+                    android:textSize="16sp"
+                    app:icon="@android:drawable/ic_lock_power_off"
+                    app:iconTint="#D32F2F" />
             </RelativeLayout>
-        </androidx.appcompat.widget.Toolbar>
+        </LinearLayout>
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
@@ -73,7 +79,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="איך הולך בלימודים?"
+                        android:text="העוזר הלימודי שלך (AI)"
                         android:textColor="@android:color/white"
                         android:textSize="20sp"
                         android:textStyle="bold" />
@@ -82,20 +88,41 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="דווח על ההתקדמות שלך כדי שהמורים יוכלו לעזור לך טוב יותר"
+                        android:text="נתקעת בשיעורי הבית? רוצה לדעת איך התקדמת?"
                         android:textColor="#E0E0E0"
                         android:textSize="14sp" />
 
-                    <Button
-                        android:id="@+id/btnReportProgress"
-                        style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
-                        android:backgroundTint="@android:color/white"
-                        android:text="עדכן התקדמות (AI)"
-                        android:textColor="#2196F3"
-                        android:textStyle="bold" />
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/btnReportProgress"
+                            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="8dp"
+                            android:backgroundTint="@android:color/white"
+                            android:text="דיווח התקדמות"
+                            android:textColor="#2196F3"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <Button
+                            android:id="@+id/btnChatAI"
+                            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:backgroundTint="#FFC107"
+                            android:text="צ'אט עם AI"
+                            android:textColor="#333333"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

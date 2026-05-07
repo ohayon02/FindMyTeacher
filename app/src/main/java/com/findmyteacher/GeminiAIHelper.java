@@ -20,7 +20,10 @@ public class GeminiAIHelper {
 
     private static final String TAG = "GeminiAIHelper";
     private static final String API_KEY = BuildConfig.API_KEY;
-    private static final String GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + API_KEY;
+    
+    // שימוש בשם המודל היציב ביותר למניעת שגיאות "Not Found"
+    private static final String MODEL_NAME = "gemini-2.5-flash";
+    private static final String GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL_NAME + ":generateContent?key=" + API_KEY;
 
     public interface AICallback {
         void onResponse(String response);
@@ -31,50 +34,47 @@ public class GeminiAIHelper {
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     public static void generateReport(String studentName, String lessonTime, AICallback callback) {
-        String prompt = "אתה עוזר הוראה חכם. צור דוח שיעור קצר עבור " + studentName + " שהיה בשעה " + lessonTime + ". תהיה מעודד וענייני.";
+        String prompt = "אתה עוזר הוראה חכם. צור דוח שיעור קצר עבור " + studentName + " שהיה בשעה " + lessonTime + ". תהיה מעודד וענייני, כתוב בעברית.";
         sendRequest(prompt, callback);
     }
 
     public static void generateStudentProgressReport(String studentName, String feedback, List<String> lessonDates, AICallback callback) {
         StringBuilder lessons = new StringBuilder();
-        if (lessonDates != null) {
+        if (lessonDates != null && !lessonDates.isEmpty()) {
             for (String date : lessonDates) lessons.append(date).append(", ");
         }
 
-        String prompt = "אתה מערכת AI לניתוח התקדמות לימודית. נתח את מצבו של התלמיד " + studentName + ".\n" +
-                "מידע מהתלמיד: " + (feedback != null ? feedback : "אין משוב עדיין") + "\n" +
-                "תאריכי שיעורים אחרונים: " + (lessons.length() > 0 ? lessons : "לא נמצאו שיעורים") + "\n\n" +
-                "צור דוח מקיף למורה הכולל:\n" +
-                "1. סיכום התקדמות כללי.\n" +
-                "2. נקודות חוזק וקושי (לפי המשוב).\n" +
-                "3. המלצות פדגוגיות להמשך.\n" +
-                "היה מקצועי, כתוב בעברית, ללא סימני עיצוב מיוחדים.";
+        String prompt = "נתח התקדמות לימודית עבור: " + studentName + ".\n" +
+                "משוב: " + (feedback != null ? feedback : "אין") + "\n" +
+                "שיעורים: " + lessons.toString() + "\n" +
+                "כתוב דוח קצר בעברית.";
 
         sendRequest(prompt, callback);
     }
 
-    public static void getPriceRecommendation(String location, String bio, String subjects, List<Integer> otherPrices, AICallback callback) {
-        StringBuilder pricesStr = new StringBuilder();
-        if (otherPrices != null && !otherPrices.isEmpty()) {
-            for (Integer p : otherPrices) pricesStr.append(p).append(", ");
+    public static void chatWithAI(String userMessage, List<Message> history, AICallback callback) {
+        StringBuilder promptBuilder = new StringBuilder();
+        promptBuilder.append("אתה עוזר לימודי. ענה בעברית.\n");
+        if (history != null) {
+            for (Message msg : history) {
+                String role = "AI".equals(msg.getSenderId()) ? "assistant: " : "user: ";
+                promptBuilder.append(role).append(msg.getText()).append("\n");
+            }
         }
+        promptBuilder.append("user: ").append(userMessage);
+        sendRequest(promptBuilder.toString(), callback);
+    }
 
-        String prompt = "אתה מומחה לתימחור שיעורים פרטיים בישראל. עזור למורה לקבוע מחיר הוגן.\n" +
-                "מיקום: " + location + "\n" +
-                "ביוגרפיה: " + bio + "\n" +
-                "מקצועות: " + subjects + "\n" +
-                "מחירים של מורים אחרים באזור: " + (pricesStr.length() > 0 ? pricesStr : "אין נתונים") + "\n\n" +
-                "בהתבסס על המידע הזה, תן המלצה למחיר לשעה (בשקלים). הסבר קצר למה בחרת במחיר זה.\n" +
-                "כתוב בעברית, קצר ולעניין.";
-
+    public static void getPriceRecommendation(String location, String bio, String subjects, List<Integer> otherPrices, AICallback callback) {
+        String prompt = "המלץ על מחיר למורה ב" + location + ". ביוגרפיה: " + bio;
         sendRequest(prompt, callback);
     }
 
     private static void sendRequest(String prompt, AICallback callback) {
         executor.execute(() -> {
             try {
-                if (API_KEY == null || API_KEY.isEmpty()) {
-                    throw new Exception("API Key missing");
+                if (API_KEY == null || API_KEY.isEmpty() || API_KEY.length() < 10) {
+                    throw new Exception("מפתח API לא תקין. בצע Sync Gradle.");
                 }
 
                 URL url = new URL(GEMINI_URL);
@@ -82,6 +82,7 @@ public class GeminiAIHelper {
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setDoOutput(true);
+                conn.setConnectTimeout(15000);
 
                 JSONObject jsonBody = new JSONObject();
                 JSONArray contents = new JSONArray();
@@ -112,7 +113,9 @@ public class GeminiAIHelper {
 
                     mainHandler.post(() -> callback.onResponse(aiText));
                 } else {
-                    throw new Exception("HTTP Error: " + responseCode);
+                    String errorBody = readStream(conn.getErrorStream());
+                    Log.e(TAG, "Error " + responseCode + ": " + errorBody);
+                    throw new Exception("שגיאת שרת " + responseCode + ". וודא שהמפתח תקין ב-Google Cloud.");
                 }
             } catch (Exception e) {
                 mainHandler.post(() -> callback.onError(e));
@@ -122,10 +125,12 @@ public class GeminiAIHelper {
 
     private static String readStream(InputStream is) {
         if (is == null) return "";
-        Scanner scanner = new Scanner(is);
-        StringBuilder sb = new StringBuilder();
-        while (scanner.hasNextLine()) sb.append(scanner.nextLine());
-        scanner.close();
-        return sb.toString();
+        try (Scanner scanner = new Scanner(is)) {
+            StringBuilder sb = new StringBuilder();
+            while (scanner.hasNextLine()) sb.append(scanner.nextLine());
+            return sb.toString();
+        } catch (Exception e) {
+            return "";
+        }
     }
 }

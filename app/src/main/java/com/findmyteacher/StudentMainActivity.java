@@ -1,11 +1,11 @@
 package com.findmyteacher;
 
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.ImageButton;
 import android.widget.SearchView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -37,6 +37,7 @@ public class StudentMainActivity extends AppCompatActivity {
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final FirebaseAuth mAuth = FirebaseAuth.getInstance();
     private TextView tvWelcome;
+    private String studentFullName = "תלמיד";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,15 +45,17 @@ public class StudentMainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_student_main);
 
         tvWelcome = findViewById(R.id.tvWelcomeUser);
-        ImageButton btnLogout = findViewById(R.id.btnLogout);
+        Button btnLogout = findViewById(R.id.btnLogout);
         RecyclerView rvTeachers = findViewById(R.id.rvTeachers);
         RecyclerView rvMyLessons = findViewById(R.id.rvMyLessons);
         SearchView searchView = findViewById(R.id.searchTeachers);
         Button btnReportProgress = findViewById(R.id.btnReportProgress);
+        Button btnChatAI = findViewById(R.id.btnChatAI);
 
         loadUserData();
         btnLogout.setOnClickListener(v -> logoutUser());
         btnReportProgress.setOnClickListener(v -> showProgressReportDialog());
+        btnChatAI.setOnClickListener(v -> startAIChat());
 
         setupTeachersRecyclerView(rvTeachers);
         setupMyLessonsRecyclerView(rvMyLessons);
@@ -63,6 +66,13 @@ public class StudentMainActivity extends AppCompatActivity {
         NotificationHelper.createNotificationChannel(this);
     }
 
+    private void startAIChat() {
+        Intent intent = new Intent(this, ChatActivity.class);
+        intent.putExtra("studentId", "AI");
+        intent.putExtra("studentName", "מורה AI חכם");
+        startActivity(intent);
+    }
+
     private void showProgressReportDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("איך הולך לך בלימודים?");
@@ -71,10 +81,10 @@ public class StudentMainActivity extends AppCompatActivity {
         input.setHint("כתוב כאן איך אתה מרגיש עם החומר, קשיים או הצלחות...");
         builder.setView(input);
 
-        builder.setPositiveButton("שלח למורים", (dialog, which) -> {
+        builder.setPositiveButton("שלח ונתח עם AI", (dialog, which) -> {
             String feedback = input.getText().toString();
             if (!feedback.isEmpty()) {
-                saveStudentFeedback(feedback);
+                saveAndAnalyzeFeedback(feedback);
             }
         });
         builder.setNegativeButton("ביטול", (dialog, which) -> dialog.cancel());
@@ -82,7 +92,7 @@ public class StudentMainActivity extends AppCompatActivity {
         builder.show();
     }
 
-    private void saveStudentFeedback(String feedback) {
+    private void saveAndAnalyzeFeedback(String feedback) {
         String uid = mAuth.getUid();
         if (uid == null) return;
 
@@ -90,9 +100,42 @@ public class StudentMainActivity extends AppCompatActivity {
         data.put("lastFeedback", feedback);
         data.put("feedbackTimestamp", System.currentTimeMillis());
 
+        ProgressDialog pd = new ProgressDialog(this);
+        pd.setMessage("שומר ומנתח עם AI...");
+        pd.show();
+
         db.collection("users").document(uid).update(data)
-                .addOnSuccessListener(aVoid -> Toast.makeText(this, "המשוב נשמר ויוצג למורים שלך", Toast.LENGTH_SHORT).show())
-                .addOnFailureListener(e -> Toast.makeText(this, "שגיאה בשמירת המשוב", Toast.LENGTH_SHORT).show());
+                .addOnSuccessListener(aVoid -> {
+                    List<String> lessonDates = myBookedLessons.stream()
+                            .map(LessonSlot::getDate)
+                            .collect(Collectors.toList());
+
+                    GeminiAIHelper.generateStudentProgressReport(studentFullName, feedback, lessonDates, new GeminiAIHelper.AICallback() {
+                        @Override
+                        public void onResponse(String response) {
+                            pd.dismiss();
+                            showAiResponseDialog(response);
+                        }
+
+                        @Override
+                        public void onError(Exception e) {
+                            pd.dismiss();
+                            Toast.makeText(StudentMainActivity.this, "הניתוח נכשל: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                })
+                .addOnFailureListener(e -> {
+                    pd.dismiss();
+                    Toast.makeText(this, "שגיאה בשמירת המשוב", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void showAiResponseDialog(String report) {
+        new AlertDialog.Builder(this)
+                .setTitle("🤖 ניתוח התקדמות AI")
+                .setMessage(report)
+                .setPositiveButton("מעולה", null)
+                .show();
     }
 
     private void setupTeachersRecyclerView(RecyclerView recyclerView) {
@@ -101,11 +144,13 @@ public class StudentMainActivity extends AppCompatActivity {
             Intent intent;
             if (isChat) {
                 intent = new Intent(StudentMainActivity.this, ChatActivity.class);
+                intent.putExtra("teacherId", teacher.getId());
+                intent.putExtra("teacherName", teacher.getFullName());
             } else {
                 intent = new Intent(StudentMainActivity.this, BookingActivity.class);
+                intent.putExtra("teacherId", teacher.getId());
+                intent.putExtra("teacherName", teacher.getFullName());
             }
-            intent.putExtra("teacherId", teacher.getId());
-            intent.putExtra("teacherName", teacher.getFullName());
             startActivity(intent);
         });
         recyclerView.setAdapter(teacherAdapter);
@@ -114,7 +159,7 @@ public class StudentMainActivity extends AppCompatActivity {
     private void setupMyLessonsRecyclerView(RecyclerView recyclerView) {
         recyclerView.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
         myLessonsAdapter = new LessonSlotAdapter(myBookedLessons, position -> {
-            // No action needed for general click
+            // Option to view details?
         });
         myLessonsAdapter.setStudentView(true);
         myLessonsAdapter.setOnCancelClickListener(position -> {
@@ -141,7 +186,7 @@ public class StudentMainActivity extends AppCompatActivity {
                 .update("availability." + slot.getDate() + "." + slot.getTime(), FieldValue.delete())
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "השיעור בוטל בהצלחה", Toast.LENGTH_SHORT).show();
-                    loadTeachersAndMyLessons(); // Refresh the list
+                    loadTeachersAndMyLessons(); 
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Error cancelling lesson", e);
@@ -171,7 +216,8 @@ public class StudentMainActivity extends AppCompatActivity {
 
         db.collection("users").document(currentUser.getUid()).get().addOnSuccessListener(doc -> {
             if (doc.exists()) {
-                tvWelcome.setText("שלום, " + doc.getString("fullName"));
+                studentFullName = doc.getString("fullName");
+                tvWelcome.setText("שלום, " + studentFullName);
             }
         }).addOnFailureListener(e -> Log.e(TAG, "Error loading user data", e));
     }
@@ -190,7 +236,6 @@ public class StudentMainActivity extends AppCompatActivity {
                         t.setId(doc.getId());
                         allTeachers.add(t);
 
-                        // Extract my lessons from this teacher
                         Map<String, Map<String, Object>> availability = (Map<String, Map<String, Object>>) doc.get("availability");
                         if (availability != null) {
                             for (Map.Entry<String, Map<String, Object>> dateEntry : availability.entrySet()) {
@@ -198,7 +243,7 @@ public class StudentMainActivity extends AppCompatActivity {
                                 for (Map.Entry<String, Object> slotEntry : dateEntry.getValue().entrySet()) {
                                     if (currentUserId.equals(slotEntry.getValue())) {
                                         LessonSlot slot = new LessonSlot(date, slotEntry.getKey(), false, currentUserId);
-                                        slot.setStudentName(t.getFullName()); // Using studentName field to store teacher name for display
+                                        slot.setStudentName(t.getFullName());
                                         slot.setTeacherId(t.getId());
                                         myBookedLessons.add(slot);
                                     }

@@ -37,6 +37,8 @@ public class ChatActivity extends AppCompatActivity {
 
     private String currentUserId;
     private CollectionReference messagesCollection;
+    private boolean isAIChat = false;
+    private final List<Message> chatHistory = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,9 +64,8 @@ public class ChatActivity extends AppCompatActivity {
             return;
         }
 
-        String chatId = generateChatId(currentUserId, otherUserId);
-        messagesCollection = db.collection("chats").document(chatId).collection("messages");
-
+        isAIChat = "AI".equals(otherUserId);
+        
         String chatPartnerName = getIntent().getStringExtra("studentName");
         if (chatPartnerName == null) {
             chatPartnerName = getIntent().getStringExtra("teacherName");
@@ -72,6 +73,15 @@ public class ChatActivity extends AppCompatActivity {
 
         setupToolbar(chatPartnerName);
         setupViews();
+
+        if (isAIChat) {
+            // For AI Chat, we might want to store messages locally or in a specific AI chat collection
+            messagesCollection = db.collection("users").document(currentUserId).collection("ai_chat");
+        } else {
+            String chatId = generateChatId(currentUserId, otherUserId);
+            messagesCollection = db.collection("chats").document(chatId).collection("messages");
+        }
+
         listenForMessages();
     }
 
@@ -107,14 +117,36 @@ public class ChatActivity extends AppCompatActivity {
         String text = etMessage.getText().toString().trim();
         if (text.isEmpty()) return;
 
-        Message message = new Message(currentUserId, text, System.currentTimeMillis());
+        Message userMessage = new Message(currentUserId, text, System.currentTimeMillis());
+        etMessage.setText("");
 
-        messagesCollection.add(message)
-                .addOnSuccessListener(documentReference -> etMessage.setText(""))
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error sending message", e);
-                    Toast.makeText(this, "Failed to send message", Toast.LENGTH_SHORT).show();
-                });
+        if (isAIChat) {
+            // Save user message
+            messagesCollection.add(userMessage);
+            
+            // Get AI Response
+            progressBar.setVisibility(View.VISIBLE);
+            GeminiAIHelper.chatWithAI(text, chatHistory, new GeminiAIHelper.AICallback() {
+                @Override
+                public void onResponse(String response) {
+                    progressBar.setVisibility(View.GONE);
+                    Message aiMessage = new Message("AI", response, System.currentTimeMillis());
+                    messagesCollection.add(aiMessage);
+                }
+
+                @Override
+                public void onError(Exception e) {
+                    progressBar.setVisibility(View.GONE);
+                    Toast.makeText(ChatActivity.this, "AI Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                }
+            });
+        } else {
+            messagesCollection.add(userMessage)
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Error sending message", e);
+                        Toast.makeText(this, "Failed to send message", Toast.LENGTH_SHORT).show();
+                    });
+        }
     }
 
     private void listenForMessages() {
@@ -127,20 +159,20 @@ public class ChatActivity extends AppCompatActivity {
                         Log.w(TAG, "Listen for messages failed.", error);
                         return;
                     }
-                    if (snapshots != null && !snapshots.isEmpty()) {
+                    if (snapshots != null) {
                         List<Message> messages = new ArrayList<>();
                         for (QueryDocumentSnapshot doc : snapshots) {
                             Message message = doc.toObject(Message.class);
                             message.setId(doc.getId());
                             messages.add(message);
                         }
+                        chatHistory.clear();
+                        chatHistory.addAll(messages);
                         adapter.submitList(messages, () -> {
                             if (adapter.getItemCount() > 0) {
                                 rvMessages.scrollToPosition(adapter.getItemCount() - 1);
                             }
                         });
-                    } else {
-                        adapter.submitList(Collections.emptyList());
                     }
                 });
     }

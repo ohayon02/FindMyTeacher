@@ -6,7 +6,7 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.widget.ImageButton;
+import android.widget.Button;
 import android.widget.SearchView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -74,7 +74,7 @@ public class TeacherMainActivity extends AppCompatActivity {
     }
 
     private void initializeViews() {
-        ImageButton btnLogout = findViewById(R.id.btnLogout);
+        Button btnLogout = findViewById(R.id.btnLogout);
         btnLogout.setOnClickListener(v -> logoutUser());
 
         MaterialCardView btnManageAvailability = findViewById(R.id.btnManageAvailability);
@@ -150,9 +150,13 @@ public class TeacherMainActivity extends AppCompatActivity {
                 @Override
                 public void onError(Exception e) {
                     pd.dismiss();
-                    Toast.makeText(TeacherMainActivity.this, "שגיאה ביצירת דוח", Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Error generating report", e);
+                    Toast.makeText(TeacherMainActivity.this, "שגיאה ביצירת דוח: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 }
             });
+        }).addOnFailureListener(e -> {
+            pd.dismiss();
+            Toast.makeText(this, "שגיאה בגישה לנתוני תלמיד", Toast.LENGTH_SHORT).show();
         });
     }
 
@@ -301,7 +305,7 @@ public class TeacherMainActivity extends AppCompatActivity {
             }
             @Override public void onError(Exception e) {
                 pd.dismiss();
-                Toast.makeText(TeacherMainActivity.this, "שגיאה ב-AI", Toast.LENGTH_SHORT).show();
+                Toast.makeText(TeacherMainActivity.this, "שגיאה ב-AI: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
