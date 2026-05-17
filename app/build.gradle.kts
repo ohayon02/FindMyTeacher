@@ -55,7 +55,8 @@ dependencies {
     
     // הגרסה היציבה שעוברת Sync
     implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
-    implementation("com.google.guava:guava:33.0.0-android")
+// בגלל שאתה משתמש ב-Futures וב-Java, וודא שגם Guava מעודכן
+    implementation("com.google.guava:guava:32.1.3-android")
 
     implementation(libs.appcompat)
     implementation(libs.material)

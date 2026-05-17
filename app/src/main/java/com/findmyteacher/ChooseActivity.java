@@ -44,13 +44,17 @@ public class ChooseActivity extends AppCompatActivity {
         Button loginButton = findViewById(R.id.btnLogin);
         Button registerButton = findViewById(R.id.btnRegister);
 
-        View.OnClickListener authListener = v -> {
+        loginButton.setOnClickListener(v -> {
             Intent intent = new Intent(ChooseActivity.this, AuthActivity.class);
+            intent.putExtra("IS_LOGIN", true);
             startActivity(intent);
-        };
+        });
 
-        loginButton.setOnClickListener(authListener);
-        registerButton.setOnClickListener(authListener);
+        registerButton.setOnClickListener(v -> {
+            Intent intent = new Intent(ChooseActivity.this, AuthActivity.class);
+            intent.putExtra("IS_LOGIN", false);
+            startActivity(intent);
+        });
     }
 
     private void checkUserTypeAndNavigate(String userId) {

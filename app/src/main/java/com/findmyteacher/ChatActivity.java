@@ -126,7 +126,7 @@ public class ChatActivity extends AppCompatActivity {
             
             // Get AI Response
             progressBar.setVisibility(View.VISIBLE);
-            GeminiAIHelper.chatWithAI(text, chatHistory, new GeminiAIHelper.AICallback() {
+            GeminiAIHelper.chatWithAI(this, text, chatHistory, new GeminiAIHelper.AICallback() {
                 @Override
                 public void onResponse(String response) {
                     progressBar.setVisibility(View.GONE);

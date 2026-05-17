@@ -140,7 +140,7 @@ public class TeacherMainActivity extends AppCompatActivity {
                     .distinct()
                     .collect(Collectors.toList());
 
-            GeminiAIHelper.generateStudentProgressReport(student.getFullName(), feedback, lessonDates, new GeminiAIHelper.AICallback() {
+            GeminiAIHelper.generateStudentProgressReport(this, student.getFullName(), feedback, lessonDates, new GeminiAIHelper.AICallback() {
                 @Override
                 public void onResponse(String response) {
                     pd.dismiss();
@@ -298,7 +298,7 @@ public class TeacherMainActivity extends AppCompatActivity {
         ProgressDialog pd = new ProgressDialog(this);
         pd.setMessage("מייצר דוח שיעור...");
         pd.show();
-        GeminiAIHelper.generateReport(slot.getStudentName(), slot.getTime(), new GeminiAIHelper.AICallback() {
+        GeminiAIHelper.generateReport(this, slot.getStudentName(), slot.getTime(), new GeminiAIHelper.AICallback() {
             @Override public void onResponse(String r) {
                 pd.dismiss();
                 new AlertDialog.Builder(TeacherMainActivity.this).setTitle("סיכום שיעור AI").setMessage(r).show();

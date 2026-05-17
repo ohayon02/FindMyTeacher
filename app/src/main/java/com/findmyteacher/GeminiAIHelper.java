@@ -1,5 +1,6 @@
 package com.findmyteacher;
 
+import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -19,10 +20,9 @@ import java.util.concurrent.Executors;
 public class GeminiAIHelper {
 
     private static final String TAG = "GeminiAIHelper";
-    private static final String API_KEY = BuildConfig.API_KEY;
-    //
-    private static final String MODEL_NAME = "gemini-2.5-flash";
-    private static final String GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL_NAME + ":generateContent?key=" + API_KEY;
+    // שימוש בגרסה v1 היציבה במקום v1beta
+    private static final String MODEL_NAME = "gemini-3.1-flash-lite";
+    private static final String BASE_URL = "https://generativelanguage.googleapis.com/v1/models/" + MODEL_NAME + ":generateContent";
 
     public interface AICallback {
         void onResponse(String response);
@@ -32,12 +32,12 @@ public class GeminiAIHelper {
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    public static void generateReport(String studentName, String lessonTime, AICallback callback) {
+    public static void generateReport(Context context, String studentName, String lessonTime, AICallback callback) {
         String prompt = "אתה עוזר הוראה חכם. צור דוח שיעור קצר עבור " + studentName + " שהיה בשעה " + lessonTime + ". תהיה מעודד וענייני, כתוב בעברית.";
         sendRequest(prompt, callback);
     }
 
-    public static void generateStudentProgressReport(String studentName, String feedback, List<String> lessonDates, AICallback callback) {
+    public static void generateStudentProgressReport(Context context, String studentName, String feedback, List<String> lessonDates, AICallback callback) {
         StringBuilder lessons = new StringBuilder();
         if (lessonDates != null && !lessonDates.isEmpty()) {
             for (String date : lessonDates) lessons.append(date).append(", ");
@@ -51,7 +51,7 @@ public class GeminiAIHelper {
         sendRequest(prompt, callback);
     }
 
-    public static void chatWithAI(String userMessage, List<Message> history, AICallback callback) {
+    public static void chatWithAI(Context context, String userMessage, List<Message> history, AICallback callback) {
         StringBuilder promptBuilder = new StringBuilder();
         promptBuilder.append("אתה עוזר לימודי. ענה בעברית.\n");
         if (history != null) {
@@ -64,7 +64,25 @@ public class GeminiAIHelper {
         sendRequest(promptBuilder.toString(), callback);
     }
 
-    public static void getPriceRecommendation(String location, String bio, String subjects, List<Integer> otherPrices, AICallback callback) {
+    public static void continueAiChat(Context context, String studentName, String history, String lastMessage, int questionCount, AICallback callback) {
+        StringBuilder prompt = new StringBuilder();
+        if (questionCount == 0) {
+            prompt.append("אתה עוזר הוראה חכם. פתח בשיחה קצרה וידידותית עם התלמיד ").append(studentName)
+                    .append(". המטרה שלך היא להבין איך הוא מרגיש לגבי הלימודים ומה הקשיים שלו. שאל שאלה ראשונה. כתוב בעברית.");
+        } else if (questionCount >= 5) {
+            prompt.append("זהו סוף השיחה עם ").append(studentName).append(". בהתבסס על ההיסטוריה הבאה:\n")
+                    .append(history)
+                    .append("\nצור סיכום קצר (עד 3 שורות) של מצבו הלימודי והרגשי. התחל את התשובה במדויק במילה 'SUMMARY:' ואחריה הסיכום.");
+        } else {
+            prompt.append("המשך שיחה עם התלמיד ").append(studentName).append(".\n")
+                    .append("היסטוריית שיחה:\n").append(history)
+                    .append("\nהודעה אחרונה מהתלמיד: ").append(lastMessage)
+                    .append("\nשאל שאלה אחת קצרה וממוקדת כדי להמשיך את האבחון. כתוב בעברית.");
+        }
+        sendRequest(prompt.toString(), callback);
+    }
+
+    public static void getPriceRecommendation(Context context, String location, String bio, String subjects, List<Integer> otherPrices, AICallback callback) {
         String prompt = "המלץ על מחיר למורה ב" + location + ". ביוגרפיה: " + bio;
         sendRequest(prompt, callback);
     }
@@ -72,11 +90,12 @@ public class GeminiAIHelper {
     private static void sendRequest(String prompt, AICallback callback) {
         executor.execute(() -> {
             try {
-                if (API_KEY == null || API_KEY.isEmpty() || API_KEY.length() < 10) {
-                    throw new Exception("מפתח API לא תקין. בצע Sync Gradle.");
+                String apiKey = BuildConfig.API_KEY;
+                if (apiKey == null || apiKey.isEmpty() || apiKey.equals("null")) {
+                    throw new Exception("מפתח API חסר. וודא שהגדרת API_KEY ב-local.properties וביצעת Sync.");
                 }
 
-                URL url = new URL(GEMINI_URL);
+                URL url = new URL(BASE_URL + "?key=" + apiKey);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
@@ -113,10 +132,18 @@ public class GeminiAIHelper {
                     mainHandler.post(() -> callback.onResponse(aiText));
                 } else {
                     String errorBody = readStream(conn.getErrorStream());
-                    Log.e(TAG, "Error " + responseCode + ": " + errorBody);
-                    throw new Exception("שגיאת שרת " + responseCode + ". וודא שהמפתח תקין ב-Google Cloud.");
+                    Log.e(TAG, "Server Error Response: " + errorBody);
+                    
+                    String message = "שגיאה " + responseCode;
+                    try {
+                        JSONObject errorJson = new JSONObject(errorBody);
+                        message = errorJson.getJSONObject("error").getString("message");
+                    } catch (Exception ignored) {}
+                    
+                    throw new Exception("גוגל החזירה שגיאה: " + message);
                 }
             } catch (Exception e) {
+                Log.e(TAG, "Request Exception: ", e);
                 mainHandler.post(() -> callback.onError(e));
             }
         });

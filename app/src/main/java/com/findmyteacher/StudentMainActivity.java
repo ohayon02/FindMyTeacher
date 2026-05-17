@@ -110,7 +110,7 @@ public class StudentMainActivity extends AppCompatActivity {
                             .map(LessonSlot::getDate)
                             .collect(Collectors.toList());
 
-                    GeminiAIHelper.generateStudentProgressReport(studentFullName, feedback, lessonDates, new GeminiAIHelper.AICallback() {
+                    GeminiAIHelper.generateStudentProgressReport(this, studentFullName, feedback, lessonDates, new GeminiAIHelper.AICallback() {
                         @Override
                         public void onResponse(String response) {
                             pd.dismiss();

@@ -57,6 +57,9 @@ public class AuthActivity extends AppCompatActivity {
         db = FirebaseFirestore.getInstance();
         progressDialog = new ProgressDialog(this);
 
+        // Get the initial state from intent extras
+        isLogin = getIntent().getBooleanExtra("IS_LOGIN", true);
+
         initializeViews();
         setupClickListeners();
         updateUI();
