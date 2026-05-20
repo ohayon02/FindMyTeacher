@@ -83,8 +83,22 @@ public class GeminiAIHelper {
     }
 
     public static void getPriceRecommendation(Context context, String location, String bio, String subjects, List<Integer> otherPrices, AICallback callback) {
-        String prompt = "המלץ על מחיר למורה ב" + location + ". ביוגרפיה: " + bio;
-        sendRequest(prompt, callback);
+        StringBuilder promptBuilder = new StringBuilder();
+        promptBuilder.append("אתה אלגוריתם תמחור קשוח עבור מורים פרטיים.\n")
+                .append("נתוני המורה:\n")
+                .append("- מיקום: ").append(location != null ? location : "לא צוין").append("\n")
+                .append("- מקצועות: ").append(subjects != null ? subjects : "לא צוין").append("\n")
+                .append("- ביוגרפיה וניסיון: ").append(bio != null ? bio : "אין").append("\n");
+
+        if (otherPrices != null && !otherPrices.isEmpty()) {
+            promptBuilder.append("- מחירי מורים אחרים באזור: ").append(otherPrices.toString()).append("\n");
+        }
+
+        promptBuilder.append("\nמשימה: קבע את המחיר המומלץ לשעה בשקלים.\n")
+                .append("חוק בל יעבור: התשובה שלך חייבת להכיל אך ורק את המספר עצמו (למשל: 120). ")
+                .append("אל תכתוב שום מילה, אל תוסיף הסברים, אל תרשום את סימן השקל (₪) ואל תוסיף נקודות. רק מספר נקי בלבד!");
+
+        sendRequest(promptBuilder.toString(), callback);
     }
 
     private static void sendRequest(String prompt, AICallback callback) {
@@ -129,17 +143,19 @@ public class GeminiAIHelper {
                             .getJSONObject(0)
                             .getString("text");
 
-                    mainHandler.post(() -> callback.onResponse(aiText));
+                    // ניקוי רווחים מיותרים או ירידות שורה שה-AI עלול להחזיר בטעות
+                    final String cleanText = aiText.trim();
+                    mainHandler.post(() -> callback.onResponse(cleanText));
                 } else {
                     String errorBody = readStream(conn.getErrorStream());
                     Log.e(TAG, "Server Error Response: " + errorBody);
-                    
+
                     String message = "שגיאה " + responseCode;
                     try {
                         JSONObject errorJson = new JSONObject(errorBody);
                         message = errorJson.getJSONObject("error").getString("message");
                     } catch (Exception ignored) {}
-                    
+
                     throw new Exception("גוגל החזירה שגיאה: " + message);
                 }
             } catch (Exception e) {
