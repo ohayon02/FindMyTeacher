@@ -17,7 +17,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.card.MaterialCardView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
@@ -47,6 +46,7 @@ public class TeacherMainActivity extends AppCompatActivity {
     private final FirebaseAuth mAuth = FirebaseAuth.getInstance();
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private ListenerRegistration teacherListener;
+    private ListenerRegistration availabilityListener;
 
     private MaterialCalendarView calendarView;
     private RecyclerView rvTodayLessons;
@@ -69,6 +69,7 @@ public class TeacherMainActivity extends AppCompatActivity {
         
         loadUserData();
         loadStudents();
+        startAvailabilityListener();
         
         NotificationHelper.createNotificationChannel(this);
     }
@@ -129,11 +130,9 @@ public class TeacherMainActivity extends AppCompatActivity {
         pd.setCancelable(false);
         pd.show();
 
-        // Get student's feedback from Firestore
         db.collection("users").document(student.getId()).get().addOnSuccessListener(doc -> {
             String feedback = doc.getString("lastFeedback");
             
-            // Collect lesson dates for this student
             List<String> lessonDates = allLessons.stream()
                     .filter(l -> student.getId().equals(l.getBookedBy()))
                     .map(LessonSlot::getDate)
@@ -200,50 +199,48 @@ public class TeacherMainActivity extends AppCompatActivity {
                 if (doc != null && doc.exists()) {
                     TextView tvWelcome = findViewById(R.id.tvWelcomeTeacher);
                     tvWelcome.setText("שלום, " + doc.getString("fullName"));
-                    updateLessonsFromDoc(doc);
                 }
             });
     }
 
-    private void updateLessonsFromDoc(DocumentSnapshot doc) {
-        allLessons.clear();
-        HashSet<CalendarDay> datesWithLessons = new HashSet<>();
-        Map<String, Map<String, Object>> availability = (Map<String, Map<String, Object>>) doc.get("availability");
-        if (availability != null) {
-            for (Map.Entry<String, Map<String, Object>> dateEntry : availability.entrySet()) {
-                String dateStr = dateEntry.getKey();
-                for (Map.Entry<String, Object> slotEntry : dateEntry.getValue().entrySet()) {
-                    boolean isBooked = slotEntry.getValue() instanceof String;
-                    String bookedBy = isBooked ? (String) slotEntry.getValue() : null;
-                    LessonSlot slot = new LessonSlot(dateStr, slotEntry.getKey(), !isBooked, bookedBy);
-                    allLessons.add(slot);
-                    if (isBooked) {
-                        fetchStudentName(slot);
-                        scheduleNotification(slot);
-                        try {
-                            String[] p = dateStr.split("-");
-                            datesWithLessons.add(CalendarDay.from(Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2])));
-                        } catch (Exception ignored) {}
-                    }
-                }
-            }
-        }
-        calendarView.removeDecorators();
-        calendarView.addDecorator(new EventDecorator(Color.GREEN, datesWithLessons));
-        filterLessonsByDate();
-    }
+    private void startAvailabilityListener() {
+        FirebaseUser user = mAuth.getCurrentUser();
+        if (user == null) return;
 
-    private void scheduleNotification(LessonSlot slot) {
-        // Schedule reminder for the teacher
-        String sid = slot.getBookedBy();
-        if (sid == null) return;
-        
-        db.collection("users").document(sid).get().addOnSuccessListener(d -> {
-            if (d.exists()) {
-                String studentName = d.getString("fullName");
-                NotificationHelper.scheduleLessonReminder(this, slot.getDate(), slot.getTime(), studentName);
-            }
-        });
+        availabilityListener = db.collection("Availability")
+                .whereEqualTo("teacherId", user.getUid())
+                .addSnapshotListener((snapshots, e) -> {
+                    if (e != null) {
+                        Log.e(TAG, "Availability listener failed.", e);
+                        return;
+                    }
+                    if (snapshots != null) {
+                        allLessons.clear();
+                        HashSet<CalendarDay> datesWithLessons = new HashSet<>();
+                        for (QueryDocumentSnapshot doc : snapshots) {
+                            String date = doc.getString("date");
+                            String time = doc.getString("time");
+                            Boolean booked = doc.getBoolean("booked");
+                            String bookedBy = doc.getString("bookedBy");
+                            
+                            boolean isBooked = booked != null && booked;
+                            LessonSlot slot = new LessonSlot(date, time, !isBooked, bookedBy);
+                            allLessons.add(slot);
+                            
+                            if (isBooked) {
+                                fetchStudentName(slot);
+                                try {
+                                    String[] p = date.split("-");
+                                    datesWithLessons.add(CalendarDay.from(Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2])));
+                                } catch (Exception ignored) {}
+                            }
+                        }
+                        calendarView.removeDecorators();
+                        calendarView.addDecorator(new EventDecorator(Color.GREEN, datesWithLessons));
+                        calendarView.invalidateDecorators();
+                        filterLessonsByDate();
+                    }
+                });
     }
 
     private void fetchStudentName(LessonSlot slot) {
@@ -312,6 +309,7 @@ public class TeacherMainActivity extends AppCompatActivity {
 
     private void logoutUser() {
         if (teacherListener != null) teacherListener.remove();
+        if (availabilityListener != null) availabilityListener.remove();
         mAuth.signOut();
         startActivity(new Intent(this, ChooseActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
         finish();
@@ -321,13 +319,20 @@ public class TeacherMainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (teacherListener != null) teacherListener.remove();
+        if (availabilityListener != null) availabilityListener.remove();
     }
 
     public static class EventDecorator implements DayViewDecorator {
         private final int color;
         private final HashSet<CalendarDay> dates;
         public EventDecorator(int color, Collection<CalendarDay> dates) { this.color = color; this.dates = new HashSet<>(dates); }
-        @Override public boolean shouldDecorate(CalendarDay d) { return dates.contains(d); }
+        @Override public boolean shouldDecorate(CalendarDay d) { return dates.contains(dayFormatCheck(d)); }
+        
+        // Helper to ensure CalendarDay comparison works regardless of internal implementation
+        private CalendarDay dayFormatCheck(CalendarDay d) {
+            return CalendarDay.from(d.getYear(), d.getMonth(), d.getDay());
+        }
+
         @Override public void decorate(DayViewFacade v) { v.addSpan(new DotSpan(10, color)); }
     }
 }

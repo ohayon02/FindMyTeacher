@@ -6,14 +6,13 @@ import android.widget.Button;
 import android.widget.CalendarView;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import androidx.appcompat.app.AppCompatActivity;
-
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
-
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.WriteBatch;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -32,7 +31,6 @@ public class TeacherAvailabilityActivity extends AppCompatActivity {
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final FirebaseAuth mAuth = FirebaseAuth.getInstance();
-    private DocumentReference teacherRef;
 
     private final List<String> selectedDates = new ArrayList<>();
 
@@ -47,7 +45,6 @@ public class TeacherAvailabilityActivity extends AppCompatActivity {
             finish();
             return;
         }
-        teacherRef = db.collection("users").document(currentUser.getUid());
 
         // Initialize Views
         calendarView = findViewById(R.id.calendarView);
@@ -83,37 +80,69 @@ public class TeacherAvailabilityActivity extends AppCompatActivity {
     }
 
     private void saveAvailability() {
-        Map<String, Object> availability = new HashMap<>();
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null) return;
+
+        String teacherId = currentUser.getUid();
+        WriteBatch batch = db.batch();
+
+        // השעות הקבועות שיוגדרו לכל יום שנבחר
+        String[] times = {"14:00", "15:00", "16:00"};
+
         for (String date : selectedDates) {
-            Map<String, Boolean> slots = new HashMap<>();
-            slots.put("14:00", true);
-            slots.put("15:00", true);
-            slots.put("16:00", true);
-            availability.put(date, slots);
+            for (String time : times) {
+                // יצירת מזהה ייחודי קבוע לכל סלוט (למשל: uid_2026-05-14_1400)
+                String timeForId = time.replace(":", "");
+                String docId = teacherId + "_" + date + "_" + timeForId;
+
+                DocumentReference slotRef = db.collection("Availability").document(docId);
+
+                Map<String, Object> slotData = new HashMap<>();
+                slotData.put("teacherId", teacherId);
+                slotData.put("date", date);
+                slotData.put("time", time);
+                slotData.put("slotId", docId);
+                slotData.put("booked", false);
+                slotData.put("bookedBy", null);
+
+                batch.set(slotRef, slotData);
+            }
         }
 
-        teacherRef.update("availability", availability)
+        // ביצוע השמירה במכה אחת בפיירבייס
+        batch.commit()
                 .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "Availability updated successfully.");
-                    Toast.makeText(TeacherAvailabilityActivity.this, "Availability saved!", Toast.LENGTH_SHORT).show();
+                    Log.d(TAG, "Availability saved successfully to Availability collection.");
+                    Toast.makeText(TeacherAvailabilityActivity.this, "השעות נשמרו בהצלחה!", Toast.LENGTH_SHORT).show();
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Error updating availability", e);
-                    Toast.makeText(TeacherAvailabilityActivity.this, "Failed to save availability.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(TeacherAvailabilityActivity.this, "שגיאה בשמירת השעות.", Toast.LENGTH_SHORT).show();
                 });
     }
 
-    @SuppressWarnings("unchecked") // Suppressing warning for Firestore data cast
     private void loadAvailability() {
-        teacherRef.get().addOnSuccessListener(documentSnapshot -> {
-            if (documentSnapshot.exists() && documentSnapshot.contains("availability")) {
-                Map<String, Object> loadedAvailability = (Map<String, Object>) documentSnapshot.get("availability");
-                if (loadedAvailability != null) {
-                    selectedDates.clear();
-                    selectedDates.addAll(loadedAvailability.keySet());
-                    updateSelectedDatesUI();
-                }
-            }
-        }).addOnFailureListener(e -> Log.e(TAG, "Error loading availability", e));
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null) return;
+
+        String teacherId = currentUser.getUid();
+
+        // טעינת השעות הקיימות מהקולקשיין החדש Availability
+        db.collection("Availability")
+                .whereEqualTo("teacherId", teacherId)
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    if (queryDocumentSnapshots != null && !queryDocumentSnapshots.isEmpty()) {
+                        selectedDates.clear();
+                        for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                            String date = doc.getString("date");
+                            if (date != null && !selectedDates.contains(date)) {
+                                selectedDates.add(date);
+                            }
+                        }
+                        updateSelectedDatesUI();
+                    }
+                })
+                .addOnFailureListener(e -> Log.e(TAG, "Error loading availability", e));
     }
 }

@@ -13,5 +13,12 @@
         android:layout_height="wrap_content"
         android:textSize="18sp"
         android:textStyle="bold"/>
+    <View
+        android:id="@+id/viewDot"
+        android:layout_width="8dp"
+        android:layout_height="8dp"
+        android:layout_marginTop="4dp"
+        android:layout_gravity="center_horizontal"
+        android:background="@android:color/transparent" />
 
 </LinearLayout>

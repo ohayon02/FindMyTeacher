@@ -23,25 +23,11 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.DateView
             this.bookedBy = bookedBy;
         }
 
-        public String getDate() {
-            return date;
-        }
-
-        public boolean isBooked() {
-            return isBooked;
-        }
-
-        public String getBookedBy() {
-            return bookedBy;
-        }
-
-        public void setBooked(boolean booked) {
-            isBooked = booked;
-        }
-
-        public void setBookedBy(String bookedBy) {
-            this.bookedBy = bookedBy;
-        }
+        public String getDate() { return date; }
+        public boolean isBooked() { return isBooked; }
+        public String getBookedBy() { return bookedBy; }
+        public void setBooked(boolean booked) { isBooked = booked; }
+        public void setBookedBy(String bookedBy) { bookedBy = bookedBy; }
     }
 
     private final List<BookingDate> dateList;
@@ -72,16 +58,17 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.DateView
     }
 
     @Override
-    public int getItemCount() {
-        return dateList.size();
-    }
+    public int getItemCount() { return dateList.size(); }
 
     static class DateViewHolder extends RecyclerView.ViewHolder {
         final TextView tvDate;
+        final View viewDot; // הנקודה החדשה בעיצוב
 
         public DateViewHolder(@NonNull View itemView, final OnDateClickListener listener) {
             super(itemView);
             tvDate = itemView.findViewById(R.id.tvDate);
+            viewDot = itemView.findViewById(R.id.viewDot); // קישור הרכיב מה-XML
+
             itemView.setOnClickListener(v -> {
                 int position = getAdapterPosition();
                 if (position != RecyclerView.NO_POSITION) {
@@ -93,16 +80,24 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.DateView
         public void bind(final BookingDate bookingDate, String currentUserId) {
             tvDate.setText(bookingDate.getDate());
 
+            // החזרת רקע ברירת המחדל של המשבצת כדי שלא תישאר צבועה ממחזור קודם
+            itemView.setBackgroundResource(android.R.drawable.dialog_holo_light_frame);
+
             if (bookingDate.isBooked()) {
+                viewDot.setVisibility(View.VISIBLE); // מציגים את הנקודה
+
                 if (currentUserId.equals(bookingDate.getBookedBy())) {
-                    itemView.setBackgroundColor(Color.GREEN); // Booked by current user
+                    // שיעור שלי -> נקודה ירוקה
+                    viewDot.setBackgroundColor(Color.GREEN);
                     itemView.setClickable(true);
                 } else {
-                    itemView.setBackgroundColor(Color.RED); // Booked by another user
+                    // תפוס ע"י מישהו אחר -> נקודה אדומה
+                    viewDot.setBackgroundColor(Color.RED);
                     itemView.setClickable(false);
                 }
             } else {
-                itemView.setBackgroundResource(android.R.drawable.dialog_holo_light_frame); // Available
+                // יום פנוי לחלוטין -> אין נקודה בכלל
+                viewDot.setVisibility(View.GONE);
                 itemView.setClickable(true);
             }
         }

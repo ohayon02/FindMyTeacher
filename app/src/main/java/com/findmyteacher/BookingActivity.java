@@ -15,16 +15,15 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 public class BookingActivity extends AppCompatActivity implements LessonSlotAdapter.OnSlotClickListener {
 
     private static final String TAG = "BookingActivity";
 
     private final List<LessonSlot> lessonSlots = new ArrayList<>();
-    // הוסר המשתנה slotDocIds כיוון שכל הסלוטים נמצאים תחת ה-teacherId במסמך המשתמשים
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private LessonSlotAdapter adapter;
     private TextView tvNoSlots;
@@ -79,42 +78,39 @@ public class BookingActivity extends AppCompatActivity implements LessonSlotAdap
         }
     }
 
-    @SuppressWarnings("unchecked")
     private void setupAvailabilityListener() {
         if (teacherId == null || currentUserId == null) {
             tvNoSlots.setVisibility(View.VISIBLE);
             return;
         }
 
-        DocumentReference teacherRef = db.collection("users").document(teacherId);
-        availabilityListener = teacherRef.addSnapshotListener(this, (documentSnapshot, e) -> {
-            if (e != null) {
-                Log.e(TAG, "Listen failed.", e);
-                tvNoSlots.setVisibility(View.VISIBLE);
-                return;
-            }
+        // האזנה בזמן אמת לקולקשיין Availability עבור מורה ספציפי
+        availabilityListener = db.collection("Availability")
+                .whereEqualTo("teacherId", teacherId)
+                .addSnapshotListener(this, (queryDocumentSnapshots, e) -> {
+                    if (e != null) {
+                        Log.e(TAG, "Listen failed.", e);
+                        tvNoSlots.setVisibility(View.VISIBLE);
+                        return;
+                    }
 
-            if (documentSnapshot != null && documentSnapshot.exists()) {
-                Map<String, Map<String, Object>> availability = (Map<String, Map<String, Object>>) documentSnapshot.get("availability");
-                lessonSlots.clear();
+                    lessonSlots.clear();
 
-                if (availability != null && !availability.isEmpty()) {
-                    for (Map.Entry<String, Map<String, Object>> dateEntry : availability.entrySet()) {
-                        String date = dateEntry.getKey();
-                        Map<String, Object> slots = dateEntry.getValue();
-                        for (Map.Entry<String, Object> slotEntry : slots.entrySet()) {
-                            String time = slotEntry.getKey();
-                            Object slotValue = slotEntry.getValue();
+                    if (queryDocumentSnapshots != null && !queryDocumentSnapshots.isEmpty()) {
+                        for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                            String date = doc.getString("date");
+                            String time = doc.getString("time");
+                            Boolean isBooked = doc.getBoolean("booked");
+                            String bookedBy = doc.getString("bookedBy");
 
-                            if (slotValue instanceof Boolean && (Boolean) slotValue) {
-                                // שיעור פנוי (ערך true במפה)
-                                LessonSlot slot = new LessonSlot(date, time, true, null);
-                                slot.setStudentName(teacherName);
-                                lessonSlots.add(slot);
-                            } else if (slotValue instanceof String) {
-                                String bookedBy = (String) slotValue;
-                                // מציג לתלמיד רק אם הוא זה שהזמין
-                                if (currentUserId.equals(bookedBy)) {
+                            if (date != null && time != null && isBooked != null) {
+                                if (!isBooked) {
+                                    // שיעור פנוי
+                                    LessonSlot slot = new LessonSlot(date, time, true, null);
+                                    slot.setStudentName(teacherName);
+                                    lessonSlots.add(slot);
+                                } else if (currentUserId.equals(bookedBy)) {
+                                    // שיעור שהתלמיד הנוכחי כבר הזמין (כדי שיוכל לבטל)
                                     LessonSlot slot = new LessonSlot(date, time, false, bookedBy);
                                     slot.setStudentName(teacherName);
                                     lessonSlots.add(slot);
@@ -122,19 +118,15 @@ public class BookingActivity extends AppCompatActivity implements LessonSlotAdap
                             }
                         }
                     }
-                }
 
-                if (lessonSlots.isEmpty()) {
-                    tvNoSlots.setVisibility(View.VISIBLE);
-                    tvNoSlots.setText("אין שיעורים פנויים כרגע");
-                } else {
-                    tvNoSlots.setVisibility(View.GONE);
-                }
-                adapter.notifyDataSetChanged();
-            } else {
-                tvNoSlots.setVisibility(View.VISIBLE);
-            }
-        });
+                    if (lessonSlots.isEmpty()) {
+                        tvNoSlots.setVisibility(View.VISIBLE);
+                        tvNoSlots.setText("אין שיעורים פנויים כרגע");
+                    } else {
+                        tvNoSlots.setVisibility(View.GONE);
+                    }
+                    adapter.notifyDataSetChanged();
+                });
     }
 
     @Override
@@ -143,28 +135,35 @@ public class BookingActivity extends AppCompatActivity implements LessonSlotAdap
 
         LessonSlot selectedSlot = lessonSlots.get(position);
 
-        // נתיב דינמי לעדכון השדה הספציפי בתוך המפה הפנימית (לדוגמה: availability.2026-05-20.10:00)
-        String fieldPath = "availability." + selectedSlot.getDate() + "." + selectedSlot.getTime();
+        if (teacherId == null) {
+            Toast.makeText(this, "שגיאה: מורה לא נמצא", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        final String date = selectedSlot.getDate();
+        final String time = selectedSlot.getTime();
+
+        // יצירת מזהה מסמך ייחודי התואם למבנה ב-Firebase
+        String timeForId = time.replace(":", "");
+        String docId = teacherId + "_" + date + "_" + timeForId;
+        final DocumentReference slotRef = db.collection("Availability").document(docId);
 
         if (selectedSlot.isAvailable()) {
-            // קביעת שיעור: הופכים את ה-Boolean למחרוזת עם ה-ID של התלמיד המזמין
-            db.collection("users").document(teacherId)
-                    .update(fieldPath, currentUserId)
+            // הזמנת שיעור: עדכון הסטטוס ל-true ומילוי מזהה התלמיד המזמין
+            slotRef.update("booked", true, "bookedBy", currentUserId)
                     .addOnSuccessListener(aVoid -> {
                         Toast.makeText(BookingActivity.this, "השיעור נקבע בהצלחה", Toast.LENGTH_SHORT).show();
-                        NotificationHelper.scheduleLessonReminder(this, selectedSlot.getDate(), selectedSlot.getTime(), teacherName);
+                        NotificationHelper.scheduleLessonReminder(this, date, time, teacherName);
                     })
                     .addOnFailureListener(err -> Toast.makeText(BookingActivity.this, "הזמנה נכשלה", Toast.LENGTH_SHORT).show());
         } else if (currentUserId.equals(selectedSlot.getBookedBy())) {
-            // ביטול שיעור קיים: מחזירים את הערך ל-true כדי שיהיה פנוי שוב
+            // ביטול שיעור שהוזמן בעבר על ידי אותו תלמיד
             new androidx.appcompat.app.AlertDialog.Builder(this)
                     .setTitle("ביטול שיעור")
                     .setMessage("האם ברצונך לבטל את השיעור שקבעת?")
                     .setPositiveButton("כן, בטל", (dialog, which) -> {
-                        db.collection("users").document(teacherId)
-                                .update(fieldPath, true)
-                                .addOnSuccessListener(aVoid -> Toast.makeText(BookingActivity.this, "השיעור בוטל", Toast.LENGTH_SHORT).show())
-                                .addOnFailureListener(err -> Toast.makeText(BookingActivity.this, "ביטול נכשל", Toast.LENGTH_SHORT).show());
+                        slotRef.update("booked", false, "bookedBy", null)
+                                .addOnSuccessListener(aVoid -> Toast.makeText(BookingActivity.this, "השיעור בוטל", Toast.LENGTH_SHORT).show());
                     })
                     .setNegativeButton("לא", null)
                     .show();
