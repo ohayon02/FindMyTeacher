@@ -61,17 +61,26 @@ public class TeacherMainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_teacher_main);
+        Log.d(TAG, "onCreate: Teacher Main Activity initialized");
 
         initializeViews();
         setupStudentRecyclerView();
         setupLessonRecyclerView();
         initCalendar();
         
+
+        
+        NotificationHelper.createNotificationChannel(this);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Log.d(TAG, "onResume: Reloading data");
         loadUserData();
         loadStudents();
         startAvailabilityListener();
-        
-        NotificationHelper.createNotificationChannel(this);
+
     }
 
     private void initializeViews() {
@@ -108,6 +117,7 @@ public class TeacherMainActivity extends AppCompatActivity {
     }
 
     private void showStudentActionDialog(Student student) {
+        Log.d(TAG, "showStudentActionDialog: for student " + student.getFullName());
         String[] options = {"צ'אט עם התלמיד", "דוח התקדמות AI"};
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(student.getFullName());
@@ -125,6 +135,7 @@ public class TeacherMainActivity extends AppCompatActivity {
     }
 
     private void generateStudentAiReport(Student student) {
+        Log.d(TAG, "generateStudentAiReport: Generating progress report for " + student.getFullName());
         ProgressDialog pd = new ProgressDialog(this);
         pd.setMessage("מנתח התקדמות עם AI...");
         pd.setCancelable(false);
@@ -143,6 +154,7 @@ public class TeacherMainActivity extends AppCompatActivity {
                 @Override
                 public void onResponse(String response) {
                     pd.dismiss();
+                    Log.d(TAG, "generateStudentAiReport: Report received from AI");
                     showAiReportDialog(student.getFullName(), response);
                 }
 
@@ -205,7 +217,10 @@ public class TeacherMainActivity extends AppCompatActivity {
 
     private void startAvailabilityListener() {
         FirebaseUser user = mAuth.getCurrentUser();
-        if (user == null) return;
+        if (user == null) {
+            Log.w(TAG, "startAvailabilityListener: User is null");
+            return;
+        }
 
         availabilityListener = db.collection("Availability")
                 .whereEqualTo("teacherId", user.getUid())
@@ -215,9 +230,11 @@ public class TeacherMainActivity extends AppCompatActivity {
                         return;
                     }
                     if (snapshots != null) {
+                        Log.d(TAG, "startAvailabilityListener: Found " + snapshots.size() + " availability slots");
                         allLessons.clear();
                         HashSet<CalendarDay> datesWithLessons = new HashSet<>();
                         for (QueryDocumentSnapshot doc : snapshots) {
+                            Log.d(TAG, "startAvailabilityListener: Processing doc: " + doc.getData());
                             String date = doc.getString("date");
                             String time = doc.getString("time");
                             Boolean booked = doc.getBoolean("booked");
@@ -235,6 +252,8 @@ public class TeacherMainActivity extends AppCompatActivity {
                                 } catch (Exception ignored) {}
                             }
                         }
+
+                        Log.d(TAG, "startAvailabilityListener: about to add " + datesWithLessons.size() + " decorators");
                         calendarView.removeDecorators();
                         calendarView.addDecorator(new EventDecorator(Color.GREEN, datesWithLessons));
                         calendarView.invalidateDecorators();
@@ -270,8 +289,10 @@ public class TeacherMainActivity extends AppCompatActivity {
     }
 
     private void loadStudents() {
+        Log.d(TAG, "loadStudents: Loading all students");
         db.collection("users").whereEqualTo("userType", "student").get()
             .addOnSuccessListener(snaps -> {
+                Log.d(TAG, "loadStudents: Successfully loaded " + snaps.size() + " students");
                 allStudents.clear();
                 for (QueryDocumentSnapshot d : snaps) {
                     Student s = d.toObject(Student.class);
@@ -292,12 +313,14 @@ public class TeacherMainActivity extends AppCompatActivity {
 
     private void generateLessonAiReport(LessonSlot slot) {
         if (slot.isAvailable()) return;
+        Log.d(TAG, "generateLessonAiReport: Requesting AI lesson summary for student: " + slot.getStudentName());
         ProgressDialog pd = new ProgressDialog(this);
         pd.setMessage("מייצר דוח שיעור...");
         pd.show();
         GeminiAIHelper.generateReport(this, slot.getStudentName(), slot.getTime(), new GeminiAIHelper.AICallback() {
             @Override public void onResponse(String r) {
                 pd.dismiss();
+                Log.d(TAG, "generateLessonAiReport: Success");
                 new AlertDialog.Builder(TeacherMainActivity.this)
                         .setTitle("סיכום שיעור AI")
                         .setMessage(r)
@@ -312,6 +335,7 @@ public class TeacherMainActivity extends AppCompatActivity {
     }
 
     private void logoutUser() {
+        Log.d(TAG, "logoutUser: Signing out");
         if (teacherListener != null) teacherListener.remove();
         if (availabilityListener != null) availabilityListener.remove();
         mAuth.signOut();

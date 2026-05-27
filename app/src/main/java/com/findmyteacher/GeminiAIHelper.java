@@ -91,7 +91,7 @@ public class GeminiAIHelper {
                 .append("- ביוגרפיה וניסיון: ").append(bio != null ? bio : "אין").append("\n");
 
         if (otherPrices != null && !otherPrices.isEmpty()) {
-            promptBuilder.append("- מחירי מורים אחרים באזור: ").append(otherPrices.toString()).append("\n");
+            promptBuilder.append("- מחירי מורים אחרים : ").append(otherPrices.toString()).append("\n");
         }
 
         promptBuilder.append("\nמשימה: קבע את המחיר המומלץ לשעה בשקלים.\n")

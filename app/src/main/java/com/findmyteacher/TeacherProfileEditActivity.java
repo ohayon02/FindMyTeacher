@@ -28,7 +28,7 @@ public class TeacherProfileEditActivity extends AppCompatActivity {
     private final FirebaseAuth mAuth = FirebaseAuth.getInstance();
     private DocumentReference teacherRef;
 
-    private EditText etPrice, etLocation, etBio, etExtraInfo;
+    private EditText etPrice, etLocation, etBio, etExtraInfo, etAvailableSlots;
     private TextView tvPriceRecommendation;
     private String currentSubjects = "";
 
@@ -54,6 +54,7 @@ public class TeacherProfileEditActivity extends AppCompatActivity {
         etLocation = findViewById(R.id.etLocation);
         etBio = findViewById(R.id.etBio);
         etExtraInfo = findViewById(R.id.etExtraInfo);
+        etAvailableSlots = findViewById(R.id.etAvailableSlots);
         tvPriceRecommendation = findViewById(R.id.tvPriceRecommendation);
         Button btnSave = findViewById(R.id.btnSaveProfile);
         Button btnCancel = findViewById(R.id.btnCancel);
@@ -71,6 +72,7 @@ public class TeacherProfileEditActivity extends AppCompatActivity {
                 etLocation.setText(doc.getString("location"));
                 etBio.setText(doc.getString("bio"));
                 etExtraInfo.setText(doc.getString("extraInfo"));
+                etAvailableSlots.setText(doc.getString("availableSlots"));
                 
                 // שליפת מקצועות לצורך ה-AI
                 Object subjectsObj = doc.get("subjects");
@@ -102,7 +104,7 @@ public class TeacherProfileEditActivity extends AppCompatActivity {
         pd.setMessage("Gemini AI מנתח מחירי שוק ומחשב המלצה...");
         pd.show();
 
-        // שליפת מחירים של מורים אחרים באזור
+        // שליפת מחירים של מורים אחרים
         db.collection("users")
                 .whereEqualTo("userType", "teacher")
                 .get()
@@ -148,6 +150,7 @@ public class TeacherProfileEditActivity extends AppCompatActivity {
         profileData.put("location", location);
         profileData.put("bio", etBio.getText().toString().trim());
         profileData.put("extraInfo", etExtraInfo.getText().toString().trim());
+        profileData.put("availableSlots", etAvailableSlots.getText().toString().trim());
 
         teacherRef.update(profileData)
                 .addOnSuccessListener(aVoid -> {

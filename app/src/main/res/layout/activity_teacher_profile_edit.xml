@@ -103,6 +103,21 @@
             android:inputType="textMultiLine"
             android:minLines="2"
             android:gravity="top"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="שעות פעילות קבועות (מופרדות בפסיק):"
+            android:textSize="16sp"
+            android:textColor="@android:color/black" />
+
+        <EditText
+            android:id="@+id/etAvailableSlots"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="לדוגמה: 14:00, 15:00, 16:00"
+            android:inputType="text"
             android:layout_marginBottom="24dp" />
 
         <Button
