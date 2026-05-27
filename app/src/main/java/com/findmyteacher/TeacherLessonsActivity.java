@@ -6,12 +6,15 @@ import android.os.Bundle;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.Toast;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.prolificinteractive.materialcalendarview.CalendarDay;
 import com.prolificinteractive.materialcalendarview.DayViewDecorator;
 import com.prolificinteractive.materialcalendarview.DayViewFacade;
@@ -82,44 +85,31 @@ public class TeacherLessonsActivity extends AppCompatActivity {
         String teacherId = mAuth.getUid();
         if (teacherId == null) return;
 
-        db.collection("users").document(teacherId)
+        // טעינת כל הסלוטים של המורה מהקולקשיין החדש Availability
+        db.collection("Availability")
+                .whereEqualTo("teacherId", teacherId)
                 .get()
-                .addOnSuccessListener(documentSnapshot -> {
+                .addOnSuccessListener(queryDocumentSnapshots -> {
                     allLessons.clear();
                     HashSet<CalendarDay> datesWithLessons = new HashSet<>();
-                    
-                    if (documentSnapshot.exists() && documentSnapshot.contains("availability")) {
-                        Map<String, Map<String, Object>> availability = (Map<String, Map<String, Object>>) documentSnapshot.get("availability");
-                        
-                        if (availability != null) {
-                            for (Map.Entry<String, Map<String, Object>> dateEntry : availability.entrySet()) {
-                                String dateStr = dateEntry.getKey();
-                                Map<String, Object> slots = dateEntry.getValue();
-                                
-                                for (Map.Entry<String, Object> slotEntry : slots.entrySet()) {
-                                    String time = slotEntry.getKey();
-                                    Object slotValue = slotEntry.getValue();
-                                    
-                                    boolean isBooked = false;
-                                    String bookedBy = null;
-                                    
-                                    if (slotValue instanceof String) {
-                                        isBooked = true;
-                                        bookedBy = (String) slotValue;
-                                    }
-                                    
-                                    LessonSlot slot = new LessonSlot(dateStr, time, !isBooked, bookedBy);
-                                    allLessons.add(slot);
-                                    
-                                    if (isBooked) {
-                                        fetchStudentName(slot);
-                                        try {
-                                            String[] parts = dateStr.split("-");
-                                            datesWithLessons.add(CalendarDay.from(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2])));
-                                        } catch (Exception ignored) {}
-                                    }
-                                }
-                            }
+
+                    for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                        String dateStr = doc.getString("date");
+                        String time = doc.getString("time");
+                        Boolean isBooked = doc.getBoolean("booked");
+                        String bookedBy = doc.getString("bookedBy");
+
+                        if (dateStr == null || time == null || isBooked == null) continue;
+
+                        LessonSlot slot = new LessonSlot(dateStr, time, !isBooked, bookedBy);
+                        allLessons.add(slot);
+
+                        if (isBooked) {
+                            fetchStudentName(slot);
+                            try {
+                                String[] parts = dateStr.split("-");
+                                datesWithLessons.add(CalendarDay.from(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2])));
+                            } catch (Exception ignored) {}
                         }
                     }
                     calendarView.removeDecorators();
@@ -189,10 +179,11 @@ public class TeacherLessonsActivity extends AppCompatActivity {
     }
 
     private void showReportDialog(String report) {
-        new android.app.AlertDialog.Builder(this)
+        new MaterialAlertDialogBuilder(this)
                .setTitle("🤖 דוח התקדמות AI")
                .setMessage(report)
-               .setPositiveButton("הבנתי", null)
+               .setPositiveButton("יציאה", (dialog, which) -> dialog.dismiss())
+               .setCancelable(true)
                .show();
     }
 

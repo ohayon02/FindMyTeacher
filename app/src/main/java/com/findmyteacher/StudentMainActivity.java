@@ -15,7 +15,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.util.ArrayList;
@@ -33,7 +32,7 @@ public class StudentMainActivity extends AppCompatActivity {
     private final List<Teacher> allTeachers = new ArrayList<>();
     private final List<Teacher> filteredTeachers = new ArrayList<>();
     private final List<LessonSlot> myBookedLessons = new ArrayList<>();
-    
+
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final FirebaseAuth mAuth = FirebaseAuth.getInstance();
     private TextView tvWelcome;
@@ -59,10 +58,10 @@ public class StudentMainActivity extends AppCompatActivity {
 
         setupTeachersRecyclerView(rvTeachers);
         setupMyLessonsRecyclerView(rvMyLessons);
-        
+
         loadTeachersAndMyLessons();
         setupSearchView(searchView);
-        
+
         NotificationHelper.createNotificationChannel(this);
     }
 
@@ -76,7 +75,7 @@ public class StudentMainActivity extends AppCompatActivity {
     private void showProgressReportDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("איך הולך לך בלימודים?");
-        
+
         final EditText input = new EditText(this);
         input.setHint("כתוב כאן איך אתה מרגיש עם החומר, קשיים או הצלחות...");
         builder.setView(input);
@@ -134,23 +133,18 @@ public class StudentMainActivity extends AppCompatActivity {
         new AlertDialog.Builder(this)
                 .setTitle("🤖 ניתוח התקדמות AI")
                 .setMessage(report)
-                .setPositiveButton("מעולה", null)
+                .setPositiveButton("יציאה", null)
                 .show();
     }
 
     private void setupTeachersRecyclerView(RecyclerView recyclerView) {
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         teacherAdapter = new TeacherAdapter(filteredTeachers, (teacher, isChat) -> {
-            Intent intent;
-            if (isChat) {
-                intent = new Intent(StudentMainActivity.this, ChatActivity.class);
-                intent.putExtra("teacherId", teacher.getId());
-                intent.putExtra("teacherName", teacher.getFullName());
-            } else {
-                intent = new Intent(StudentMainActivity.this, BookingActivity.class);
-                intent.putExtra("teacherId", teacher.getId());
-                intent.putExtra("teacherName", teacher.getFullName());
-            }
+            // ייעול כפילות ה-Intent: החלפת מחלקת היעד בצורה דינמית
+            Class<?> targetClass = isChat ? ChatActivity.class : BookingActivity.class;
+            Intent intent = new Intent(StudentMainActivity.this, targetClass);
+            intent.putExtra("teacherId", teacher.getId());
+            intent.putExtra("teacherName", teacher.getFullName());
             startActivity(intent);
         });
         recyclerView.setAdapter(teacherAdapter);
@@ -158,35 +152,42 @@ public class StudentMainActivity extends AppCompatActivity {
 
     private void setupMyLessonsRecyclerView(RecyclerView recyclerView) {
         recyclerView.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
-        myLessonsAdapter = new LessonSlotAdapter(myBookedLessons, position -> {
-            // Option to view details?
-        });
+
+        // הוסר ה-Listener הריק של הלחיצה הכללית
+        myLessonsAdapter = new LessonSlotAdapter(myBookedLessons, null);
+
         myLessonsAdapter.setStudentView(true);
-        myLessonsAdapter.setOnCancelClickListener(position -> {
-            showCancelConfirmation(position);
-        });
+        myLessonsAdapter.setOnCancelClickListener(this::showCancelConfirmation);
         recyclerView.setAdapter(myLessonsAdapter);
     }
 
     private void showCancelConfirmation(int position) {
         LessonSlot slot = myBookedLessons.get(position);
+        // תיקון המלל מ"הסטודנט" ל"המורה" כדי שיתאים למסך התלמיד
         new AlertDialog.Builder(this)
                 .setTitle("ביטול שיעור")
-                .setMessage("האם אתה בטוח שברצונך לבטל את השיעור עם " + slot.getStudentName() + " בתאריך " + slot.getDate() + " בשעה " + slot.getTime() + "?")
-                .setPositiveButton("כן, בטל", (dialog, which) -> cancelLesson(slot))
+                .setMessage("האם אתה בטוח שברצונך לבטל את השיעור עם המורה " + slot.getStudentName() + " בתאריך " + slot.getDate() + " בשעה " + slot.getTime() + "?")
+                .setPositiveButton("כן, בטל", (dialog, which) -> cancelLesson(slot, position))
                 .setNegativeButton("לא", null)
                 .show();
     }
 
-    private void cancelLesson(LessonSlot slot) {
+    private void cancelLesson(LessonSlot slot, int position) {
         String teacherId = slot.getTeacherId();
         if (teacherId == null) return;
 
-        db.collection("users").document(teacherId)
-                .update("availability." + slot.getDate() + "." + slot.getTime(), FieldValue.delete())
+        String timeForId = slot.getTime().replace(":", "");
+        String docId = teacherId + "_" + slot.getDate() + "_" + timeForId;
+
+        db.collection("Availability").document(docId)
+                .update("booked", false, "bookedBy", null)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "השיעור בוטל בהצלחה", Toast.LENGTH_SHORT).show();
-                    loadTeachersAndMyLessons(); 
+                    // ייעול: עדכון מקומי במקום קריאה חוזרת ויקרה לכל ה-Database מהשרת
+                    if (position >= 0 && position < myBookedLessons.size()) {
+                        myBookedLessons.remove(position);
+                        myLessonsAdapter.notifyItemRemoved(position);
+                    }
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Error cancelling lesson", e);
@@ -230,31 +231,35 @@ public class StudentMainActivity extends AppCompatActivity {
                 .addOnSuccessListener(queryDocumentSnapshots -> {
                     allTeachers.clear();
                     myBookedLessons.clear();
-                    
+
+                    Map<String, String> teacherNames = new HashMap<>();
                     for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
                         Teacher t = doc.toObject(Teacher.class);
                         t.setId(doc.getId());
                         allTeachers.add(t);
-
-                        Map<String, Map<String, Object>> availability = (Map<String, Map<String, Object>>) doc.get("availability");
-                        if (availability != null) {
-                            for (Map.Entry<String, Map<String, Object>> dateEntry : availability.entrySet()) {
-                                String date = dateEntry.getKey();
-                                for (Map.Entry<String, Object> slotEntry : dateEntry.getValue().entrySet()) {
-                                    if (currentUserId.equals(slotEntry.getValue())) {
-                                        LessonSlot slot = new LessonSlot(date, slotEntry.getKey(), false, currentUserId);
-                                        slot.setStudentName(t.getFullName());
-                                        slot.setTeacherId(t.getId());
-                                        myBookedLessons.add(slot);
-                                    }
-                                }
-                            }
-                        }
+                        teacherNames.put(t.getId(), t.getFullName());
                     }
-                    filterTeachers(""); 
-                    myLessonsAdapter.notifyDataSetChanged();
+                    filterTeachers("");
+
+                    db.collection("Availability")
+                            .whereEqualTo("bookedBy", currentUserId)
+                            .get()
+                            .addOnSuccessListener(slotsDocs -> {
+                                for (QueryDocumentSnapshot slotDoc : slotsDocs) {
+                                    String date = slotDoc.getString("date");
+                                    String time = slotDoc.getString("time");
+                                    String tId = slotDoc.getString("teacherId");
+
+                                    LessonSlot slot = new LessonSlot(date, time, false, currentUserId);
+                                    slot.setTeacherId(tId);
+                                    slot.setStudentName(teacherNames.getOrDefault(tId, "מורה"));
+                                    myBookedLessons.add(slot);
+                                }
+                                myLessonsAdapter.notifyDataSetChanged();
+                            })
+                            .addOnFailureListener(e -> Log.e(TAG, "Error loading booked lessons", e));
                 })
-                .addOnFailureListener(e -> Log.e(TAG, "Error loading data", e));
+                .addOnFailureListener(e -> Log.e(TAG, "Error loading teachers", e));
     }
 
     private void filterTeachers(String query) {
@@ -263,11 +268,11 @@ public class StudentMainActivity extends AppCompatActivity {
             filteredTeachers.addAll(allTeachers);
         } else {
             String lowerCaseQuery = query.toLowerCase();
-            List<Teacher> result = allTeachers.stream()
+            // ייעול ה-Stream: הזרמה ישירה לתוך הרשימה ללא יצירת רשימה זמנית בזיכרון
+            allTeachers.stream()
                     .filter(t -> (t.getFullName() != null && t.getFullName().toLowerCase().contains(lowerCaseQuery)) ||
-                                 (t.getSubjectsString() != null && t.getSubjectsString().toLowerCase().contains(lowerCaseQuery)))
-                    .collect(Collectors.toList());
-            filteredTeachers.addAll(result);
+                            (t.getSubjectsString() != null && t.getSubjectsString().toLowerCase().contains(lowerCaseQuery)))
+                    .forEach(filteredTeachers::add);
         }
         teacherAdapter.notifyDataSetChanged();
     }

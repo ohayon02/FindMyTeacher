@@ -298,7 +298,11 @@ public class TeacherMainActivity extends AppCompatActivity {
         GeminiAIHelper.generateReport(this, slot.getStudentName(), slot.getTime(), new GeminiAIHelper.AICallback() {
             @Override public void onResponse(String r) {
                 pd.dismiss();
-                new AlertDialog.Builder(TeacherMainActivity.this).setTitle("סיכום שיעור AI").setMessage(r).show();
+                new AlertDialog.Builder(TeacherMainActivity.this)
+                        .setTitle("סיכום שיעור AI")
+                        .setMessage(r)
+                        .setPositiveButton("יציאה", null)
+                        .show();
             }
             @Override public void onError(Exception e) {
                 pd.dismiss();
